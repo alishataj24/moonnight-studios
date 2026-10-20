@@ -1,0 +1,11 @@
+node_modules
+dist
+.enquiries
+.env
+.env.local
+.env.*.local
+.DS_Store
+.tmp-thumbs
+.media-staging
+*.tsbuildinfo
+.vercel

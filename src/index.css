@@ -1,0 +1,2539 @@
+/* ==================================================================
+   A film, not a page.
+
+   The whole experience is a sequence of acts. An act is a tall `.track`
+   containing a `.stage` that sticks to the viewport while the track
+   scrolls past it. The scroll engine turns each track's position into a
+   0 → 1 progress value and writes it here as custom properties; every
+   rule below reads those numbers and does the actual choreography.
+
+   Which means: the motion is in the CSS, the numbers are in the JS, and
+   nothing listens to the wheel. Native scroll all the way down.
+   ================================================================== */
+
+:root {
+  /* ---- Palette ----------------------------------------------------
+       Midnight Blue  #111C2A   the ground. Near-black, so the pictures
+                                stay the brightest thing on screen.
+       Slate Blue     #28394A   the second surface — the About act, and
+                                the transition between dark sections.
+       Warm Ivory     #F0ECE4   text on dark, and the light acts.
+       Soft Bronze    #B69A70   accent on dark. Hairlines, focus rings,
+                                selected states. Never a fill, never a
+                                gradient, never a glow.
+       Muted Bronze   #786C5A   accent on light. The restrained one.
+
+     Measured, not eyeballed:
+       Ivory on Midnight   14.6:1      Ivory on Slate        10.1:1
+       Midnight on Ivory   14.6:1      Soft Bronze on dark    6.4:1
+     ------------------------------------------------------------------ */
+  --ink: #111c2a;
+  --slate: #28394a;
+  --ivory: #f0ece4;
+  --soft-bronze: #b69a70;
+  --bronze: #786c5a;
+
+  /* Two tiny lifts, both forced by measurement rather than taste.
+     Soft Bronze is 4.42:1 on Slate and Muted Bronze 4.36:1 on Ivory —
+     fine for a rule, just short of AA for the small letterspaced caps
+     the eyebrows are set in. Five per cent in each direction clears it
+     and is imperceptible beside the parent colour. */
+  --accent-text-dark: #b99e76;
+  --accent-text-light: #736858;
+
+  /* Scrims are NOT the brand colour. A saturated hue announces itself
+     the moment it covers anything. Near-black, mostly neutral, so a veil
+     darkens a frame without grading it. */
+  --scrim: 8, 13, 20;
+
+  /* Contextual: Soft Bronze on the dark grounds, Muted Bronze on the
+     light ones, which override both tokens. */
+  --accent: var(--soft-bronze);
+  --accent-text: var(--accent-text-dark);
+
+  --line-dark: rgba(240, 236, 228, 0.16);
+  --line-light: rgba(17, 28, 42, 0.16);
+
+  /* Type */
+  /* One family. The three voices are built from weight, size and
+     tracking rather than from two faces — Manrope has no italic and
+     no companion serif, so a second family would have to be invented
+     and the contrast has to come from somewhere real. */
+  --face: Manrope, "Avenir Next", "Segoe UI", system-ui, sans-serif;
+
+  /* Space */
+  --s1: 0.5rem;
+  --s2: 0.875rem;
+  --s3: 1.5rem;
+  --s4: 2.5rem;
+  --s5: 4rem;
+  --s6: 6.5rem;
+  --s7: clamp(5rem, 11vw, 10.5rem);
+  --gutter: clamp(1.25rem, 5vw, 4.5rem);
+  --max: 1440px;
+
+  /* Motion */
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-film: cubic-bezier(0.16, 1, 0.3, 1);
+
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 5rem;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  overflow-x: clip;
+  background: var(--ink);
+  color: var(--ivory);
+  font-family: var(--face);
+  font-size: 1rem;
+  line-height: 1.65;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+body.is-locked { overflow: hidden; }
+
+img, video, svg { display: block; max-width: 100%; }
+picture { display: block; width: 100%; height: 100%; }
+button, input, select, textarea { font: inherit; color: inherit; }
+a { color: inherit; text-decoration: none; }
+h1, h2, h3, h4, p, figure { margin: 0; }
+ul, ol { margin: 0; padding: 0; list-style: none; }
+::selection { background: var(--accent); color: var(--ink); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+
+/* ---------- Primitives -------------------------------------------- */
+
+.u-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip-path: inset(50%);
+  white-space: nowrap; border: 0;
+}
+
+.skip {
+  position: absolute;
+  left: var(--gutter);
+  top: -5rem;
+  z-index: 400;
+  padding: 0.7rem 1rem;
+  background: var(--ivory);
+  color: var(--ink);
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  transition: top 0.2s var(--ease);
+}
+.skip:focus { top: 1rem; }
+
+.eyebrow {
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+}
+
+/* ---- Three voices ------------------------------------------------
+   One family now, so the registers cannot come from a second face.
+   They come from weight: display and standfirst are LIGHT (300),
+   body and interface are regular to medium, and the pivot word is the
+   only bold on the page. Three weights, three voices.
+
+   The risk with one family is the page collapsing into two registers,
+   headline and not-headline. What keeps the standfirst its own voice
+   is that it is lighter than the body copy beneath it as well as
+   larger — a difference a face with 200–800 can actually carry.
+
+   Tracking is not a constant. A face wants less of it as it grows, so
+   each step carries its own value and the display, which is the
+   largest, is the tightest. A geometric sans wants considerably more
+   negative tracking at size than a serif does.
+   ------------------------------------------------------------------ */
+
+/* Sizes are down roughly a fifth on the serif they replace. Manrope
+   has a far larger x-height than Cormorant, so the same font-size
+   reads much bigger; these are matched by apparent size, not by the
+   number. Light weights and hard tracking are what keep a geometric
+   sans editorial at display size. */
+.display {
+  font-family: var(--face);
+  font-weight: 300;
+  font-size: clamp(2.3rem, 6.6vw, 5.4rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+}
+.head {
+  font-family: var(--face);
+  font-weight: 300;
+  font-size: clamp(1.75rem, 3.9vw, 3.3rem);
+  line-height: 1.1;
+  letter-spacing: -0.032em;
+  text-wrap: balance;
+}
+.head-sm {
+  font-family: var(--face);
+  font-weight: 400;
+  font-size: clamp(1.3rem, 2.1vw, 1.75rem);
+  line-height: 1.2;
+  letter-spacing: -0.022em;
+}
+
+/* The pivot. One word per headline, and the only weight change in a
+   headline on the whole site — which is what keeps it meaning
+   something.
+
+   It used to be a serif italic. Manrope has no italic at all, and a
+   browser-synthesised oblique is a slanted roman, not an italic: the
+   letterforms are wrong and it looks like a rendering fault at display
+   size. Weight carries the emphasis instead, which a geometric sans
+   does better than it does slant. */
+.display em,
+.head em,
+.head-sm em {
+  font-style: normal;
+  font-weight: 700;
+  /* Tighter than the light roman around it: the heavier cut sets
+     wider, and left alone it opens a hole on either side. The margin
+     puts back what the tracking takes off the last letter — letter
+     spacing is applied after the final glyph too, so without it the
+     pivot runs into the word after it. */
+  letter-spacing: -0.045em;
+  margin-right: 0.045em;
+}
+
+/* The standfirst: the register the page was missing. Serif, lighter
+   than the headline, set long and loose, and clearly not body copy. */
+/* The standfirst. With one family it is no longer "the serif one": it
+   is lighter than body copy, set larger and looser, which is a real
+   difference in a face with this much weight range. */
+.lead {
+  font-family: var(--face);
+  font-weight: 300;
+  font-size: clamp(1.12rem, 1.5vw, 1.34rem);
+  line-height: 1.55;
+  letter-spacing: 0.002em;
+  max-width: 34ch;
+  color: rgba(240, 236, 228, 0.9);
+  text-wrap: pretty;
+}
+
+.mask-line { display: block; overflow: hidden; padding-bottom: 0.08em; }
+.mask-line > [data-reveal] { display: block; }
+
+/* ---------- Buttons ------------------------------------------------ */
+
+.cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-height: 48px;
+  padding: 0 0.1rem;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-size: 0.73rem;
+  font-weight: 600;
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+  color: inherit;
+  position: relative;
+}
+.cta::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0.65rem;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.45;
+  transform-origin: left;
+  transition: opacity 0.4s var(--ease);
+}
+.cta:hover::after, .cta:focus-visible::after { opacity: 1; }
+.cta .arrow { display: inline-block; transition: transform 0.45s var(--ease-film); }
+.cta:hover .arrow, .cta:focus-visible .arrow { transform: translate(0.22em, -0.22em); }
+
+.cta-solid {
+  padding: 0 1.6rem;
+  background: var(--ivory);
+  color: var(--ink);
+  transition: background 0.35s var(--ease), color 0.35s var(--ease);
+}
+.cta-solid::after { display: none; }
+.cta-solid:hover, .cta-solid:focus-visible { background: var(--accent); }
+.cta-solid:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ---------- Reveal (entrance only; scroll work is done by the stages) */
+
+[data-reveal="rise"] {
+  opacity: 0;
+  transform: translateY(22px);
+  transition: opacity 0.85s var(--ease), transform 1s var(--ease-film);
+}
+[data-reveal="line"] {
+  opacity: 0;
+  transform: translateY(0.9em);
+  transition: opacity 0.7s var(--ease), transform 0.95s var(--ease-film);
+}
+[data-reveal="frame"],
+[data-reveal="curtain"] { position: relative; overflow: hidden; }
+[data-reveal="frame"]::after,
+[data-reveal="curtain"]::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: 2;
+  pointer-events: none;
+  background: var(--reveal-veil, var(--ink));
+  transition: transform 1.25s var(--ease-film);
+}
+[data-reveal="frame"]::after { transform-origin: bottom; }
+[data-reveal="curtain"]::after { transform-origin: right; }
+[data-reveal="frame"][data-shown="true"]::after { transform: scaleY(0); }
+[data-reveal="curtain"][data-shown="true"]::after { transform: scaleX(0); }
+[data-reveal][data-shown="true"] { opacity: 1; transform: none; }
+
+/* ==================================================================
+   THE EDITORIAL GRID
+
+   Everything on the page aligns to four zones:
+
+     rail    fixed in the left margin — wordmark, nav, nothing else
+     label   kept as a measuring line only — nothing is set in it now
+     body    one narrow measure. Copy never runs wider than this.
+     air     left empty on purpose. About a quarter of the screen.
+
+   The discipline WAS the design, and it went too far: every act
+   starting its copy at the same x, with the same numbered label beside
+   it, stopped reading as composed and started reading as a template
+   with the content swapped out. The grid still holds the left edge and
+   keeps type clear of the rail. What changed is that each act now
+   places its words where its own picture wants them — one low in the
+   frame, one against the air, one centred on the last scene — instead
+   of every act inheriting the same slot.
+   ================================================================== */
+
+:root {
+  --rail-w: clamp(9rem, 16vw, 13rem);
+  --label-w: clamp(5rem, 8vw, 8rem);
+  --body-w: 38rem;
+}
+
+.rail {
+  position: fixed;
+  top: calc(var(--s5) + env(safe-area-inset-top, 0px));
+  left: var(--gutter);
+  width: var(--rail-w);
+  z-index: 100;
+  display: none;
+  grid-template-rows: auto 1fr auto;
+  gap: var(--s4);
+  height: calc(100svh - var(--s5) * 2);
+  pointer-events: none;
+}
+.rail > * { pointer-events: auto; }
+
+/* The rail sits over photography, so it needs a floor. A soft left-edge
+   scrim rather than a panel: it reads as the vignette a lens would give
+   the frame, and it means the rail never has to invert, hide on scroll
+   or carry a background of its own. */
+.rail::before {
+  content: "";
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: min(52vw, 38rem);
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(
+    to right,
+    rgba(var(--scrim), 0.94) 0%,
+    rgba(var(--scrim), 0.8) 30%,
+    rgba(var(--scrim), 0.38) 62%,
+    rgba(var(--scrim), 0) 100%
+  );
+}
+
+.wordmark {
+  display: block;
+  width: 4.75rem;
+  line-height: 0;
+}
+.wordmark img {
+  width: 100%;
+  height: auto;
+}
+
+.rail-nav { display: grid; align-content: start; gap: 0.1rem; }
+.rail-link {
+  position: relative;
+  font-size: 0.74rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  padding-block: 0.42rem;
+  color: rgba(240, 236, 228, 0.6);
+  transition: color 0.3s var(--ease), padding-left 0.4s var(--ease-film);
+  width: fit-content;
+}
+.rail-link::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 0;
+  height: 1px;
+  background: var(--accent);
+  transition: width 0.4s var(--ease-film);
+}
+.rail-link:hover, .rail-link:focus-visible, .rail-link[data-active="true"] {
+  color: var(--ivory);
+  padding-left: 1.4rem;
+}
+.rail-link:hover::before,
+.rail-link:focus-visible::before,
+.rail-link[data-active="true"]::before { width: 0.9rem; }
+
+.rail-foot {
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(240, 236, 228, 0.34);
+  max-width: 12ch;
+  line-height: 1.7;
+}
+
+/* Narrow: no margin to live in, so it becomes a bar and a sheet. */
+.rail-toggle {
+  position: fixed;
+  top: calc(0.9rem + env(safe-area-inset-top, 0px));
+  right: var(--gutter);
+  z-index: 110;
+  min-height: 44px;
+  padding-inline: 0.4rem;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: var(--ivory);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+  mix-blend-mode: difference;
+}
+.rail-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 105;
+  display: grid;
+  align-content: center;
+  gap: 0.3rem;
+  padding: var(--s6) var(--gutter);
+  background: var(--ink);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.35s var(--ease), visibility 0.35s;
+}
+.rail-sheet[data-open="true"] { opacity: 1; visibility: visible; }
+.rail-sheet .rail-link {
+  font-family: var(--face);
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  font-size: clamp(1.6rem, 6.6vw, 2.1rem);
+  letter-spacing: 0;
+  color: var(--ivory);
+  padding-block: 0.35rem;
+}
+.rail-sheet .rail-link::before { display: none; }
+
+@media (min-width: 1100px) {
+  .rail { display: grid; }
+  .rail-toggle, .rail-sheet { display: none; }
+}
+
+/* One row once the rail is gone: mark, name, menu. A scrim fades
+   into the picture so the row can be read without becoming a slab. */
+.mobile-bar { display: none; }
+.bar-mark {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 44px;
+  min-width: 0;
+  color: var(--ivory);
+}
+.bar-mark img {
+  height: 2.35rem;
+  width: auto;
+  flex: none;
+}
+.bar-mark span {
+  font-size: 0.98rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+@media (max-width: 1099px) {
+  .mobile-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    position: fixed;
+    z-index: 110;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding:
+      calc(0.4rem + env(safe-area-inset-top, 0px))
+      var(--gutter)
+      1.6rem;
+    background: linear-gradient(
+      to bottom,
+      rgba(8, 13, 20, 0.78) 0%,
+      rgba(8, 13, 20, 0.42) 55%,
+      rgba(8, 13, 20, 0) 100%
+    );
+    pointer-events: none;
+  }
+  .mobile-bar > * { pointer-events: auto; }
+  .rail-toggle {
+    position: static;
+    top: auto;
+    right: auto;
+    display: flex;
+    align-items: center;
+    flex: none;
+    mix-blend-mode: normal;
+  }
+  .rail-sheet {
+    padding-top: calc(4.75rem + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(2rem + env(safe-area-inset-bottom, 0px));
+  }
+  .rail-sheet .rail-link {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+  }
+}
+
+/* ---------- The spread ------------------------------------------- */
+
+/* Everything that is not full bleed sits in this. */
+.spread {
+  display: grid;
+  grid-template-columns: [label] var(--label-w) [body] minmax(0, var(--body-w)) [air] 1fr;
+  column-gap: clamp(1.5rem, 3vw, 3rem);
+  padding-inline: var(--gutter);
+}
+@media (min-width: 1100px) {
+  .spread { padding-left: calc(var(--rail-w) + var(--gutter) * 2); }
+}
+@media (max-width: 899px) {
+  /* The label column collapses above its content rather than beside it. */
+  .spread { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* The margin label is gone. It was a number, a word in small caps and
+   a hairline in the left column of five acts, and five acts carrying
+   the same furniture in the same place is what made the page read as a
+   template rather than as a sequence of compositions. Each act places
+   its own words now. The `label` grid line stays — several layouts
+   still measure from it — but nothing is set in it. */
+
+.spread > .body { grid-column: body; display: grid; gap: var(--s3); justify-items: start; }
+@media (max-width: 899px) { .spread > .body { grid-column: 1; } }
+
+/* Two deliberate escapes, and only two. */
+.spread > .wide { grid-column: body / -1; }
+@media (max-width: 899px) { .spread > .wide { grid-column: 1; } }
+
+/* ---------- Act scaffolding ---------------------------------------- */
+
+.act { position: relative; }
+.track { position: relative; }
+.stage {
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  overflow: hidden;
+}
+.anchor { position: absolute; left: 0; width: 1px; height: 1px; }
+
+/* One shared picture container, used by every act. */
+.frame { position: relative; width: 100%; height: 100%; overflow: hidden; background: var(--slate); }
+.frame-inner { position: absolute; inset: 0; will-change: transform; }
+.frame-inner img,
+.frame-inner video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 1.1s var(--ease-film);
+}
+.frame-inner video {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.9s var(--ease);
+}
+.frame-inner video[data-playing="true"] { opacity: 1; }
+
+.frame-open {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  color: var(--ivory);
+  -webkit-tap-highlight-color: transparent;
+}
+.play-mark {
+  width: clamp(2.6rem, 3.4vw, 3.4rem);
+  aspect-ratio: 1;
+  border: 1px solid rgba(240, 236, 228, 0.55);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(var(--scrim), 0.26);
+  opacity: 0.8;
+  transform: scale(0.94);
+  transition: opacity 0.4s var(--ease), transform 0.5s var(--ease-film),
+    background 0.4s var(--ease), border-color 0.4s var(--ease);
+}
+.play-mark::before {
+  content: "";
+  width: 0; height: 0;
+  margin-left: 0.18em;
+  border-left: 0.62em solid currentColor;
+  border-top: 0.4em solid transparent;
+  border-bottom: 0.4em solid transparent;
+}
+.frame-open:hover .play-mark,
+.frame-open:focus-visible .play-mark {
+  opacity: 1;
+  transform: scale(1);
+  background: rgba(var(--scrim), 0.42);
+  border-color: var(--accent);
+}
+.frame:hover .frame-inner img { transform: scale(1.03); }
+
+/* ---------- ACT I — arrival ------------------------------------- */
+
+.arrival-type {
+  position: absolute;
+  z-index: 30;
+  left: 0;
+  right: 0;
+  bottom: clamp(3.5rem, 9vh, 6rem);
+  /* Clears before the push begins: reading and travelling at the same
+     time always looks like a slide deck. */
+  opacity: clamp(0, calc(1 - var(--p, 0) * 3.4), 1);
+  transform: translateY(calc(var(--p, 0) * -14svh));
+  pointer-events: auto;
+}
+.arrival-type h1 { max-width: 12ch; }
+.arrival-type .lead { color: rgba(240, 236, 228, 0.92); }
+
+/* The words need a floor under them that the picture does not provide.
+   Raised when the display went from a 500-weight serif to a 300-weight
+   sans: measured at the glyph rather than over the bounding box, the
+   headline was sitting at 3.7:1 against the sky, which clears the
+   large-text threshold and nothing more. */
+.act-arrival .world-slot:first-child .world-veil {
+  background:
+    radial-gradient(124% 94% at 50% 46%, rgba(var(--scrim), 0) 52%, rgba(var(--scrim), 0.34) 100%),
+    linear-gradient(
+      to top,
+      rgba(var(--scrim), 0.9) 0%,
+      rgba(var(--scrim), 0.72) 32%,
+      rgba(var(--scrim), 0.34) 52%,
+      rgba(var(--scrim), 0) 72%
+    );
+}
+
+/* ==================================================================
+   THE GATE AND THE TWO WORLDS
+
+   The portfolio is not part of the page scroll. The gate is a section;
+   the worlds are overlays that take the screen. Entering one should
+   feel like going somewhere, not like reaching the next block.
+   ================================================================== */
+
+/* A track, not a screen. The two fields are what you can click; the
+   length is what lets the rest of the work flow in behind them. */
+.gate {
+  position: relative;
+  background: var(--ink);
+  z-index: 2;
+  /* 190, not 240: the hold releases once the track's foot reaches the
+     foot of the screen, so anything past that is scroll with nothing
+     happening. Measured — at 240svh the flow finished at 55%. */
+  height: 190svh;
+  --p: 0;
+}
+.gate-hold {
+  position: sticky;
+  top: 0;
+  min-height: 100svh;
+  display: grid;
+  /* stretch, not center: centring makes the stage shrink-to-fit, and
+     then its own width:100% resolves against itself and collapses. */
+  align-items: center;
+  justify-items: stretch;
+  padding: var(--s6) var(--gutter);
+  overflow: clip;
+}
+/* The gate lives in the content area like everything else — the rail
+   owns the left margin and nothing is allowed to sit under it. */
+@media (min-width: 1100px) {
+  .gate-hold { padding-left: calc(var(--rail-w) + var(--gutter) * 2); }
+}
+
+/* Two fields, different shapes, overlapping — one picture plane with
+   two things in it, not a pair of cards. */
+.fine-print {
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  line-height: 1.6;
+  color: rgba(240, 236, 228, 0.52);
+  margin-top: var(--s1);
+}
+
+.gate-stage {
+  position: relative;
+  width: min(var(--max), 100%);
+  margin-inline: auto;
+  /* Taller than it was. At 16/8.2 the composition left 188px of bare
+     ground above it — the only genuinely flat band left on the page
+     once dark photographs stopped being counted as gaps. */
+  aspect-ratio: 16 / 9.6;
+  --mx: 0;
+  --my: 0;
+}
+
+.gate-field {
+  position: absolute;
+  border: 0;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+  color: var(--ivory);
+  overflow: visible;
+  transition: transform 0.9s var(--ease-film), filter 0.7s var(--ease), opacity 0.7s var(--ease);
+}
+.gate-field[data-world="images"] {
+  left: 0;
+  top: 0;
+  width: 50%;
+  height: 80%;
+  z-index: 2;
+  transform: translate3d(calc(var(--mx) * -22px), calc(var(--my) * -16px), 0);
+}
+.gate-field[data-world="films"] {
+  right: 0;
+  bottom: 0;
+  width: 62%;
+  height: 74%;
+  z-index: 1;
+  transform: translate3d(calc(var(--mx) * 14px), calc(var(--my) * 10px), 0);
+}
+
+.gate-media {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  display: block;
+  background: var(--slate);
+}
+.gate-media img,
+.gate-media video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* The crop widens as a field is approached — it shows you more of the
+     scene rather than just getting bigger. */
+  transform: scale(1.12);
+  transition: transform 1.1s var(--ease-film), filter 0.7s var(--ease);
+}
+
+/* The stills cross-fade in place. All of them are stacked; only the
+   current one is opaque, so nothing reflows and nothing jumps. */
+.gate-media picture {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 1.1s var(--ease);
+}
+.gate-media picture[data-on] { opacity: 1; }
+/* A floor for the name. Both fields put a word at their foot and both
+   can have a bright picture under it — "Images" over sunlit grass was
+   unreadable. */
+.gate-media::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(
+    to top,
+    rgba(var(--scrim), 0.93) 0%,
+    rgba(var(--scrim), 0.66) 20%,
+    rgba(var(--scrim), 0) 46%
+  );
+}
+.gate-media::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--grain);
+  background-size: 140px 140px;
+  mix-blend-mode: overlay;
+  opacity: 0.38;
+  pointer-events: none;
+}
+
+/* The names of the two destinations, at the size of a destination.
+   They were 0.7rem at 0.34em tracking, floating on the dark ground
+   outside the pictures — which made them read as captions filed under
+   two images rather than as the two things you came here to open. */
+.gate-label {
+  position: absolute;
+  z-index: 2;
+  font-family: var(--face);
+  font-size: clamp(2.1rem, 4.4vw, 3.9rem);
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: -0.035em;
+  text-transform: none;
+  white-space: nowrap;
+  padding-bottom: 0.22em;
+  color: var(--ivory);
+  transition: color 0.5s var(--ease), opacity 0.5s var(--ease);
+}
+/* Inside the frame, standing on it. */
+.gate-field[data-world="images"] .gate-label {
+  left: clamp(1rem, 2.2vw, 2rem);
+  bottom: clamp(0.75rem, 1.8vw, 1.5rem);
+}
+.gate-field[data-world="films"] .gate-label {
+  right: clamp(1rem, 2.2vw, 2rem);
+  bottom: clamp(0.75rem, 1.8vw, 1.5rem);
+}
+/* A rule that draws itself under the name on approach. The only mark
+   on the two fields, and it only exists while you are reaching for
+   one — it is feedback, not furniture. */
+.gate-label::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.6s var(--ease-film);
+}
+.gate-field[data-world="films"] .gate-label::after { transform-origin: right; }
+.gate-field:hover .gate-label::after,
+.gate-field:focus-visible .gate-label::after { transform: scaleX(1); }
+
+/* Approach: the near field comes forward and opens; the far one cools
+   and recedes. Focus drives the identical state for the keyboard. */
+.gate-stage[data-near="images"] .gate-field[data-world="images"],
+.gate-stage[data-near="films"] .gate-field[data-world="films"] { z-index: 3; }
+.gate-stage[data-near="images"] .gate-field[data-world="images"] .gate-media img,
+.gate-stage[data-near="films"] .gate-field[data-world="films"] .gate-media video {
+  transform: scale(1);
+}
+.gate-stage[data-near="images"] .gate-field[data-world="films"],
+.gate-stage[data-near="films"] .gate-field[data-world="images"] {
+  filter: saturate(0.5) brightness(0.62);
+  opacity: 0.8;
+}
+.gate-stage[data-near="images"] .gate-field[data-world="films"] .gate-label,
+.gate-stage[data-near="films"] .gate-field[data-world="images"] .gate-label { opacity: 0.45; }
+
+/* ---- The work flowing in ---------------------------------------
+
+   Eight frames placed around the two fields and timed off one scroll
+   channel. Each carries its own cue in `--in`; the easing is done in
+   the stylesheet with clamp(), so scrolling writes a single number and
+   nothing else crosses the JS boundary.
+
+   They sit behind the two buttons and never take a click — the whole
+   point of the act is that there are exactly two things to press. */
+.gate-flow {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.gate-drift {
+  position: absolute;
+  margin: 0;
+  overflow: hidden;
+  /* 0 → 1 across this frame's own slice of the scroll. */
+  --t: clamp(0, calc((var(--p, 0) - var(--in)) * 5), 1);
+  opacity: calc(var(--t) * 0.92);
+  transform: translate3d(
+      calc(var(--dx, 0) * (1 - var(--t)) * 1px),
+      calc((1 - var(--t)) * 5rem),
+      0
+    )
+    scale(calc(0.94 + var(--t) * 0.06));
+  box-shadow: 0 1.5rem 4rem rgba(var(--scrim), 0.5);
+}
+.gate-drift picture { display: block; width: 100%; height: 100%; }
+.gate-drift img { width: 100%; height: 100%; object-fit: cover; }
+
+/* Hand-placed, and placed to reinforce the diagonal the two fields
+   already make: a cluster in the top-right corner, a cluster in the
+   bottom-left, and two frames running off the outer edges. The centre
+   under the images field is left alone — two frames sitting there read
+   as stragglers that missed the composition rather than as part of
+   it. */
+.gate-drift:nth-child(1) { width: 22%; aspect-ratio: 3/2;  right: 2%;  top: -4%;  --dx: 70; }
+.gate-drift:nth-child(2) { width: 15%; aspect-ratio: 4/5;  left: 56%;  top: -10%;  --dx: 30; }
+.gate-drift:nth-child(3) { width: 18%; aspect-ratio: 3/2;  left: -5%;  bottom: 2%; --dx: -70; }
+.gate-drift:nth-child(4) { width: 13%; aspect-ratio: 1/1;  left: 2%;   bottom: -14%; --dx: -45; }
+.gate-drift:nth-child(5) { width: 16%; aspect-ratio: 4/5;  right: -4%; bottom: 20%; --dx: 80; }
+.gate-drift:nth-child(6) { width: 14%; aspect-ratio: 3/2;  left: 56%;  bottom: -10%; --dx: 25; }
+.gate-drift:nth-child(7) { width: 12%; aspect-ratio: 1/1;  right: 26%; top: -8%;   --dx: 40; }
+.gate-drift:nth-child(8) { width: 17%; aspect-ratio: 3/2;  left: -7%;  top: 14%;   --dx: -60; }
+
+/* The two fields settle back as the work arrives, so the composition
+   changes rather than simply accumulating. */
+.gate-stage {
+  transform: scale(calc(1 - clamp(0, calc((var(--p, 0) - 0.3) * 0.16), 0.07)));
+  transition: transform 0.2s linear;
+}
+
+@media (max-width: 760px) {
+  /* Stacked, both at rest, both plainly tappable. No overlap games on a
+     screen where there is no pointer to approach with. */
+  .gate-stage { aspect-ratio: auto; display: grid; gap: 3.4rem; transform: none; }
+  /* There is no composition to flow into at this width — the two
+     fields are stacked full-bleed and anything placed around them
+     lands on top of one of them. */
+  .gate-flow { display: none; }
+  .gate { height: auto; }
+  .gate-hold { position: static; min-height: 0; overflow: visible; }
+  /* Matched on [data-world] so these beat the positioned desktop rules —
+     a plain .gate-field selector loses to them on specificity even
+     inside a media query, which silently collapsed the fields to 217px. */
+  .gate-stage .gate-field[data-world] {
+    position: relative;
+    left: auto; right: auto; top: auto; bottom: auto;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 4 / 3;
+    transform: none !important;
+  }
+  /* On the picture here too. Hung below it the name reads as a caption
+     filed under a photograph rather than as the door into a room. */
+  .gate-stage .gate-field[data-world] .gate-label {
+    top: auto;
+    right: auto;
+    left: clamp(0.9rem, 4vw, 1.5rem);
+    bottom: clamp(0.7rem, 3vw, 1.2rem);
+  }
+  .gate-stage { gap: 1.6rem; }
+  .gate-media img, .gate-media video { transform: scale(1); }
+}
+
+/* ---------- The overlay both worlds live in --------------------- */
+
+.world-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: var(--ink);
+  animation: world-open 0.6s var(--ease-film) both;
+  overflow: hidden;
+}
+@keyframes world-open {
+  from { opacity: 0; transform: scale(1.04); }
+  to { opacity: 1; transform: none; }
+}
+
+.world-chrome {
+  position: absolute;
+  z-index: 40;
+  left: var(--gutter);
+  right: var(--gutter);
+  bottom: calc(1.1rem + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  pointer-events: none;
+}
+.world-chrome > * { pointer-events: auto; }
+.world-count {
+  font-size: 0.68rem;
+  letter-spacing: 0.2em;
+  color: rgba(240, 236, 228, 0.6);
+  font-variant-numeric: tabular-nums;
+}
+.world-steps { display: flex; align-items: center; gap: 0.3rem; margin-left: auto; }
+/* Says what the gesture is. A full-screen takeover with no visible
+   affordance leaves the visitor scrolling at a picture that does not
+   answer — which is exactly what it did. */
+.world-hint {
+  margin-left: 0.6rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(240, 236, 228, 0.46);
+  white-space: nowrap;
+}
+.world-chrome button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: var(--ivory);
+  opacity: 0.65;
+  transition: opacity 0.3s var(--ease), color 0.3s var(--ease);
+}
+/* The way out. It sits in the top-right corner on its own, away from
+   the two step arrows: leaving and moving along are different jobs and
+   a row of three controls made the one that matters hardest to find. */
+.world-close {
+  position: fixed;
+  z-index: 60;
+  cursor: pointer;
+  top: calc(0.9rem + env(safe-area-inset-top, 0px));
+  right: var(--gutter);
+  display: flex;
+  align-items: center;
+  gap: clamp(0.7rem, 1.4vw, 1.1rem);
+  width: auto;
+  height: auto;
+  /* A hit area far larger than the marks inside it. */
+  padding: 0.9rem 0.4rem 0.9rem 1rem;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  opacity: 1;
+  color: rgba(240, 236, 228, 0.82);
+}
+.world-close-word {
+  font-family: var(--face);
+  font-size: clamp(1.15rem, 1.7vw, 1.6rem);
+  font-weight: 300;
+  letter-spacing: -0.025em;
+  line-height: 1;
+  text-transform: none;
+}
+/* Two lines, crossed. Drawn rather than an icon so they can turn. */
+.world-close-mark {
+  position: relative;
+  width: clamp(1.5rem, 2.1vw, 2rem);
+  height: clamp(1.5rem, 2.1vw, 2rem);
+  flex: none;
+  transition: transform 0.55s var(--ease-film);
+}
+.world-close-mark i {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background: currentColor;
+  transform-origin: center;
+  transition: transform 0.55s var(--ease-film), background 0.4s var(--ease);
+}
+.world-close-mark i:first-child { transform: rotate(45deg); }
+.world-close-mark i:last-child { transform: rotate(-45deg); }
+
+/* Approached, it turns a quarter and opens out. */
+.world-close:hover,
+.world-close:focus-visible { color: var(--ivory); }
+.world-close:hover .world-close-mark,
+.world-close:focus-visible .world-close-mark { transform: rotate(90deg) scale(1.18); }
+.world-close:hover .world-close-mark i,
+.world-close:focus-visible .world-close-mark i { background: var(--accent); }
+.world-close:hover .world-close-word,
+.world-close:focus-visible .world-close-word { color: var(--ivory); }
+
+.world-chrome button:hover, .world-chrome button:focus-visible { opacity: 1; color: var(--accent); }
+.world-chrome svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 1.3; fill: none; }
+
+
+@media (max-width: 620px) {
+  .world-hint { display: none; }
+  .world-close { right: calc(var(--gutter) - 0.4rem); }
+}
+
+/* ---------- IMAGES — the exhibition ------------------------------ */
+
+.exhibition {
+  position: absolute;
+  inset: 0;
+  --mx: 0;
+  --my: 0;
+  touch-action: pan-y;
+}
+
+/* Every picture is one absolutely-centred element whose slot is written
+   as custom properties. Moving the hero changes the numbers, and the
+   whole field travels at once — transform and opacity only. */
+.exhibition .plate {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(54vw, 74svh * var(--ar, 1.5));
+  aspect-ratio: var(--ar, 1.5);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  overflow: hidden;
+  z-index: calc(var(--z, 0) + 1);
+  opacity: 1;
+  transform:
+    translate3d(
+      calc(-50% + var(--x, 0) * 1vw + var(--mx) * var(--z, 0) * -2.4px),
+      calc(-50% + var(--y, 0) * 1svh + var(--my) * var(--z, 0) * -1.8px),
+      0
+    )
+    scale(var(--s, 1));
+  transition:
+    transform 1.05s var(--ease-film),
+    opacity 0.7s var(--ease),
+    filter 0.7s var(--ease);
+}
+.exhibition .plate[data-parked] {
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(-50%, -50%, 0) scale(0.08);
+}
+.exhibition .plate:not([data-hero]) { filter: brightness(0.74) saturate(0.86); }
+.exhibition .plate:not([data-hero]):hover,
+.exhibition .plate:not([data-hero]):focus-visible { filter: none; }
+.exhibition .plate img { width: 100%; height: 100%; object-fit: cover; }
+.exhibition .plate::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--grain);
+  background-size: 140px 140px;
+  mix-blend-mode: overlay;
+  opacity: 0.34;
+  pointer-events: none;
+}
+
+@media (max-width: 760px) {
+  /* One picture at a time, swiped. The field is a desktop idea; on a
+     phone the satellites would be thumbnails too small to hit. */
+  .exhibition .plate { width: min(86vw, 62svh * var(--ar, 1.5)); }
+  .exhibition .plate:not([data-hero]) { opacity: 0; pointer-events: none; }
+}
+
+/* ---------- FILMS — the screening room --------------------------- */
+
+.screening {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: clamp(1rem, 2.4vh, 2rem);
+  padding: clamp(2.5rem, 6vh, 4rem) var(--gutter) calc(4.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+.program {
+  position: relative;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 0.75rem;
+  min-height: 0;
+}
+.program video {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: contain;
+  background: #000;
+  cursor: pointer;
+}
+
+/* The transport. Discreet, but never hidden behind a hover — on touch
+   there is no hover, and a control you cannot find is not a control. */
+.program-bar {
+  display: flex;
+  align-items: center;
+  gap: clamp(0.6rem, 1.6vw, 1.1rem);
+}
+.pill {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  border: 1px solid var(--line-dark);
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+  color: var(--ivory);
+  transition: border-color 0.3s var(--ease), color 0.3s var(--ease);
+}
+.pill:hover, .pill:focus-visible { border-color: var(--accent); color: var(--accent); }
+.pill svg { width: 15px; height: 15px; stroke: currentColor; stroke-width: 1.6; fill: none; }
+
+.scrub { position: relative; flex: 1 1 auto; display: grid; align-items: center; min-height: 40px; }
+.scrub input {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  margin: 0;
+  background: none;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 40px;
+  cursor: pointer;
+}
+.scrub input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 11px; height: 11px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-top: -5px;
+}
+.scrub input::-moz-range-thumb {
+  width: 11px; height: 11px; border: 0; border-radius: 50%; background: var(--accent);
+}
+.scrub input::-webkit-slider-runnable-track { height: 1px; background: transparent; }
+.scrub input::-moz-range-track { height: 1px; background: transparent; }
+.scrub-track {
+  position: absolute;
+  left: 0; right: 0;
+  height: 1px;
+  background: rgba(240, 236, 228, 0.2);
+  pointer-events: none;
+}
+.scrub-track span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transform-origin: left;
+}
+.clock {
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  color: rgba(240, 236, 228, 0.62);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* The strip. Posters only — one video element exists in this room. */
+.strip {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 0.2rem;
+  scroll-snap-type: x proximity;
+}
+.strip::-webkit-scrollbar { display: none; }
+.strip-frame {
+  position: relative;
+  flex: 0 0 auto;
+  width: clamp(76px, 10vw, 128px);
+  aspect-ratio: 16 / 9;
+  border: 0;
+  padding: 0;
+  background: var(--slate);
+  cursor: pointer;
+  overflow: hidden;
+  opacity: 0.44;
+  scroll-snap-align: center;
+  transition: opacity 0.4s var(--ease), outline-color 0.3s var(--ease);
+  outline: 1px solid transparent;
+  outline-offset: -1px;
+}
+.strip-frame img { width: 100%; height: 100%; object-fit: cover; }
+.strip-frame:hover, .strip-frame:focus-visible { opacity: 0.8; }
+.strip-frame[data-on] { opacity: 1; outline-color: var(--accent); }
+
+@media (prefers-reduced-motion: reduce) {
+  .world-overlay { animation: none; }
+  .exhibition .plate { transition: none; }
+  .gate-field, .gate-media img, .gate-media video { transition: none; transform: none !important; }
+  /* No cross-fade: the first still simply stays. */
+  .gate-media picture { transition: none; }
+}
+
+/* ---------- ACT V — the resort chain ---------------------------- */
+
+/* One veil across the whole chain, so the copy has a consistent floor
+   whichever world is currently on screen. */
+.chain-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  opacity: max(
+    clamp(0, calc(1 - (var(--p, 0) - 0.22) * 6), 1),
+    clamp(0, calc((var(--p, 0) - 0.84) * 7), 1)
+  );
+  /* Reaches across the body column, which is where the copy is — the
+     rail scrim only covers the margin. */
+  background: linear-gradient(to right,
+    rgba(var(--scrim), 0.72) 0%,
+    rgba(var(--scrim), 0.66) 34%,
+    rgba(var(--scrim), 0.42) 62%,
+    rgba(var(--scrim), 0) 86%);
+}
+
+.act-resort .resort-copy {
+  position: absolute;
+  z-index: 30;
+  left: 0;
+  right: 0;
+}
+.act-resort .resort-copy {
+  top: 50%;
+  transform: translateY(calc(-50% + var(--p, 0) * -16svh));
+  opacity: clamp(0, calc(1 - (var(--p, 0) - 0.16) * 7), 1);
+  pointer-events: none;
+}
+.act-resort .resort-copy .lead { color: rgba(240, 236, 228, 0.94); }
+
+@media (max-width: 819px) {
+  .act-resort .resort-copy { top: auto; bottom: clamp(7rem, 18svh, 10rem); transform: none; }
+  .chain-veil {
+    background: linear-gradient(to top,
+      rgba(var(--scrim), 0.94) 0%,
+      rgba(var(--scrim), 0.8) 26%,
+      rgba(var(--scrim), 0.34) 54%,
+      rgba(var(--scrim), 0.08) 80%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arrival-type,
+  .act-resort .resort-copy {
+    position: relative;
+    inset: auto;
+    opacity: 1 !important;
+    transform: none !important;
+    margin-inline: auto;
+    padding-block: var(--s4);
+    max-width: var(--max);
+  }
+  .chain-veil { display: none; }
+}
+
+/* ---------- Act 03: the instrument ------------------------------ */
+
+/* One frame fills the screen; a small pad in the margin moves it along
+   two axes. Everything that reads as interface here is sized like a
+   production note rather than like a control, so the picture stays the
+   loudest thing on screen. */
+.act-instrument {
+  position: relative;
+  z-index: 3;
+
+  background: var(--ink);
+  min-height: 100svh;
+  display: grid;
+  align-items: end;
+  overflow: clip;
+  padding-block: var(--s5);
+}
+
+.inst-frame {
+  position: absolute;
+  inset: 0;
+  grid-area: 1 / 1;
+}
+.inst-plate {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  overflow: hidden;
+}
+.inst-plate picture { display: block; width: 100%; height: 100%; }
+.inst-plate img { width: 100%; height: 100%; object-fit: cover; }
+
+/* The outgoing frame holds its pixels while the incoming one is
+   uncovered over it, so the stage is never empty mid-move. */
+.inst-plate[data-state="out"] {
+  animation: inst-drop 900ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+.inst-plate[data-state="in"] picture {
+  animation: inst-open 900ms cubic-bezier(0.62, 0, 0.2, 1) both;
+}
+.inst-plate[data-hidden="true"] { opacity: 0; transition: opacity 420ms ease; }
+
+@keyframes inst-open {
+  from { clip-path: inset(0 0 0 100%); }
+  to   { clip-path: inset(0 0 0 0); }
+}
+@keyframes inst-drop {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+.inst-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 520ms ease;
+}
+.inst-video[data-on="true"] { opacity: 1; }
+
+.inst-veil {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  /* Weighted to the foot, where the controls are, and opened across
+     the top two-thirds so the frame is actually seen. */
+  background:
+    linear-gradient(
+      to top,
+      rgba(var(--scrim), 0.95) 0%,
+      rgba(var(--scrim), 0.91) 34%,
+      rgba(var(--scrim), 0.76) 52%,
+      rgba(var(--scrim), 0.22) 76%,
+      rgba(var(--scrim), 0.38) 100%
+    ),
+    linear-gradient(to right, rgba(var(--scrim), 0.45) 0%, rgba(var(--scrim), 0) 46%);
+}
+
+.inst-ui {
+  position: relative;
+  grid-area: 1 / 1;
+  z-index: 2;
+  align-content: end;
+  row-gap: var(--s4);
+}
+
+/* The coordinate. Sits in the margin beside the line it describes,
+   set as words rather than as a small-caps chip — it is a reading, not
+   a label. */
+.inst-coord {
+  grid-column: label;
+  align-self: end;
+  margin: 0 0 0.3rem;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: rgba(240, 236, 228, 0.6);
+}
+
+.inst-controls {
+  grid-column: body / air;
+  display: grid;
+  gap: var(--s3);
+  max-width: 46rem;
+}
+.inst-note {
+  margin: 0;
+  font-family: var(--face);
+  font-weight: 300;
+  font-size: clamp(1.18rem, 2.1vw, 1.72rem);
+  line-height: 1.3;
+  letter-spacing: -0.028em;
+  max-width: 22ch;
+  color: var(--ivory);
+  animation: inst-note-in 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes inst-note-in {
+  from { opacity: 0; transform: translateY(0.6rem); }
+  to   { opacity: 1; transform: none; }
+}
+
+.inst-pad-set {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: clamp(1.75rem, 4vw, 4rem);
+}
+
+/* The pad and its two axes share one grid, so each label has a track
+   of its own. Laid over the dots they collided with each other and
+   with the controls beside them. */
+.inst-pad-wrap {
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-rows: auto auto;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+}
+.inst-axis-name {
+  font-family: var(--face);
+  font-size: 0.52rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(240, 236, 228, 0.38);
+}
+.inst-name-y {
+  grid-area: 1 / 1;
+  justify-self: end;
+}
+/* Only wanted where the per-stop labels are hidden. */
+.inst-name-x { grid-area: 1 / 2; display: none; }
+
+.inst-axis {
+  display: grid;
+  font-family: var(--face);
+  font-size: 0.54rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(240, 236, 228, 0.58);
+}
+.inst-axis i { font-style: normal; }
+/* Each label sits over its own column / beside its own row. */
+.inst-axis-x {
+  grid-area: 1 / 2;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  text-align: center;
+}
+.inst-axis-y {
+  grid-area: 2 / 1;
+  /* Stretched, or the three labels shrink-to-fit and stack in the
+     middle instead of sitting one beside each row. */
+  align-self: stretch;
+  grid-template-rows: repeat(3, 1fr);
+  gap: 2px;
+  align-items: center;
+  justify-items: end;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.inst-pad {
+  grid-area: 2 / 2;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  padding: 2px;
+  background: rgba(240, 236, 228, 0.16);
+  touch-action: manipulation;
+}
+.inst-cell {
+  width: clamp(3rem, 4.6vw, 3.9rem);
+  height: clamp(3rem, 4.6vw, 3.9rem);
+  display: grid;
+  place-items: center;
+  border: 0;
+  padding: 0;
+  /* Light enough to read as a surface against any frame behind it. */
+  background: rgba(240, 236, 228, 0.07);
+  backdrop-filter: blur(3px);
+  cursor: pointer;
+  transition: background 320ms ease;
+}
+.inst-cell:hover { background: rgba(240, 236, 228, 0.18); }
+.inst-cell[aria-checked="true"] { background: rgba(182, 154, 112, 0.34); }
+.inst-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(240, 236, 228, 0.5);
+  transition: background 320ms ease, transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.inst-cell[aria-checked="true"] .inst-dot {
+  background: var(--ivory);
+  transform: scale(2.1);
+}
+
+.inst-motion { display: grid; gap: 0.75rem; justify-items: start; }
+/* The disclosure, now that this act is where the resort chain lands. */
+.inst-note-fine { margin-top: var(--s2); max-width: 44ch; }
+.inst-roll,
+.inst-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 44px;
+  padding: 0.55rem 0;
+  border: 0;
+  background: none;
+  font-family: var(--face);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ivory);
+  cursor: pointer;
+  transition: color 300ms ease;
+}
+.inst-open { color: rgba(240, 236, 228, 0.72); }
+.inst-roll:hover, .inst-open:hover { color: var(--accent); }
+/* A record mark, not an icon set: it fills when the frame is running. */
+.inst-roll-mark {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1px solid var(--accent);
+  transition: background 320ms ease, box-shadow 320ms ease;
+}
+.inst-roll[aria-pressed="true"] .inst-roll-mark {
+  background: var(--accent);
+  box-shadow: 0 0 0 4px rgba(182, 154, 112, 0.18);
+}
+
+/* Rides up over the chain's exit. A full-bleed sticky stage has to
+   scroll away at the end, and that exit is one screen of photograph
+   with nothing on it — the last thing seen before this act. Pulling
+   this act up means the frame left on screen is the one with the
+   controls on it.
+
+   Only where the chain IS a pinned full-bleed stage. Below 1100px the
+   resort copy is bottom-anchored and under reduced motion the chain is
+   a plain vertical run of pictures — in both cases this margin pulls
+   the instrument over the resort's own headline, which is what it did
+   until it was measured. */
+@media (min-width: 1100px) and (prefers-reduced-motion: no-preference) {
+  .act-instrument { margin-top: -58svh; }
+}
+
+@media (max-width: 1100px) {
+  .act-instrument { min-height: 0; display: block; padding-block: var(--s5); }
+  .inst-frame { position: relative; inset: auto; aspect-ratio: 4 / 5; max-height: 68svh; }
+  .inst-ui { margin-top: var(--s4); }
+  .inst-veil {
+    background: linear-gradient(to top, rgba(var(--scrim), 0.85) 0%, rgba(var(--scrim), 0) 46%);
+  }
+  .inst-pad-set { gap: 2.25rem 3.5rem; }
+}
+@media (max-width: 899px) {
+  .inst-coord, .inst-controls { grid-column: 1; }
+  .inst-coord { margin-bottom: var(--s2); }
+  /* Three stop names are wider than three pad columns here and run
+     into each other; the names of the axes fit and say enough. */
+  .inst-axis-x, .inst-axis-y { display: none; }
+  .inst-name-x { display: block; }
+  .inst-pad-wrap { grid-template-columns: auto; }
+  .inst-name-y { grid-area: auto; justify-self: start; }
+  .inst-name-x { grid-area: auto; }
+  .inst-pad { grid-area: auto; }
+  .inst-pad-wrap { gap: 0.35rem; justify-items: start; }
+}
+
+/* ---------- Act 04: the point of view --------------------------- */
+
+/* The position, written on a frame. Three marks sit at points that
+   are really in the picture, each with a leader back to what it
+   refers to — a director's note on a still, not a feature list. */
+/* --s5, not --s7. At 158px top and bottom this act contributed over
+   half of a 268px dead band against the instrument above it — measured
+   by scanning the rendered page for rows with nothing in them. */
+.act-viewpoint {
+  position: relative;
+  z-index: 3;
+  background: var(--ink);
+  padding-block: var(--s5);
+}
+.vp-spread { row-gap: var(--s4); }
+
+/* Runs off the right edge of the screen. Boxed in on all four sides
+   it was a picture card on a dark page; carried to the edge it reads
+   as a window, and the dark left margin becomes the room you are
+   standing in rather than a gap. */
+.vp-plate {
+  grid-column: body / -1;
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  margin-right: calc(var(--gutter) * -1);
+}
+@media (min-width: 1100px) {
+  .vp-plate { aspect-ratio: 2 / 1; }
+}
+.vp-plate picture { display: block; width: 100%; height: 100%; }
+.vp-plate img { width: 100%; height: 100%; object-fit: cover; }
+.vp-gel {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    rgba(var(--scrim), 0.4) 0%,
+    rgba(var(--scrim), 0.22) 40%,
+    rgba(var(--scrim), 0.6) 100%
+  );
+}
+
+.vp-mark {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: 0;
+  height: 0;
+}
+.vp-pin {
+  position: absolute;
+  inset: -22px auto auto -22px;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+  z-index: 2;
+}
+.vp-n {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid rgba(240, 236, 228, 0.6);
+  background: rgba(var(--scrim), 0.55);
+  font-family: var(--face);
+  font-size: 0.56rem;
+  letter-spacing: 0.08em;
+  color: var(--ivory);
+  font-variant-numeric: tabular-nums;
+  transition: background 320ms ease, border-color 320ms ease, transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.vp-mark[data-open="true"] .vp-n {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--ink);
+  transform: scale(1.12);
+}
+
+/* The leader is drawn, not implied: it runs from the pin to the edge
+   of the note, and it is the thing that makes the mark point at
+   something rather than float over it. */
+.vp-leader {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 2.4rem;
+  height: 1px;
+  background: rgba(240, 236, 228, 0.5);
+  transform-origin: left center;
+  transform: scaleX(0);
+  transition: transform 460ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.vp-mark[data-open="true"] .vp-leader { transform: scaleX(1); }
+.vp-mark[data-side="left"] .vp-leader {
+  left: auto;
+  right: 0;
+  transform-origin: right center;
+}
+
+.vp-note {
+  position: absolute;
+  top: -0.6rem;
+  left: 2.9rem;
+  width: min(19rem, 38vw);
+  padding: 0.75rem 1rem;
+  background: rgba(var(--scrim), 0.88);
+  /* A flat slate with one lit edge, not a pane of glass: the blur was
+     doing nothing the scrim was not already doing. */
+  border-left: 1px solid var(--accent);
+  opacity: 0;
+  transform: translateY(0.4rem);
+  pointer-events: none;
+  transition: opacity 380ms ease, transform 460ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.vp-mark[data-side="left"] .vp-note {
+  left: auto;
+  right: 2.9rem;
+  border-left: 0;
+  border-right: 1px solid var(--accent);
+}
+.vp-mark[data-open="true"] .vp-note {
+  opacity: 1;
+  transform: none;
+  transition-delay: 160ms;
+}
+.vp-term {
+  margin: 0 0 0.4rem;
+  font-family: var(--face);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+}
+.vp-copy {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.65;
+  color: rgba(240, 236, 228, 0.86);
+}
+
+/* The same three read straight through. On a wide screen it is the
+   quiet transcript under the picture; on a phone it is the act. */
+/* Where the marks exist, the picture is the act and this is hidden.
+   As a numbered row under a hairline it was a process timeline, which
+   is the one thing this act must not look like. */
+.vp-list {
+  grid-column: body / -1;
+  display: grid;
+  gap: var(--s4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.vp-item { display: grid; gap: 0.5rem; max-width: 42ch; }
+@media (min-width: 900px) {
+  .vp-list { display: none; }
+}
+/* One quiet line under the frame. It was tried in the left margin
+   beside the picture; the track is 115px wide and it broke to four
+   lines, which is worse than a plain line with room around it. */
+.vp-price {
+  grid-column: body / -1;
+  margin: 0;
+  max-width: 44ch;
+  font-size: 0.82rem;
+  line-height: 1.7;
+  color: rgba(240, 236, 228, 0.62);
+}
+
+@media (max-width: 899px) {
+  .vp-plate, .vp-list, .vp-price { grid-column: 1; }
+  /* The marks are a pointer interaction. On a phone the picture is
+     simply a picture and the list carries the act. */
+  .vp-mark { display: none; }
+}
+
+
+/* ---------- Act 05: about --------------------------------------- */
+
+/* The picture stands behind the words rather than under them. The
+   scroll only lets it settle: it arrives a little oversized, comes to
+   rest, and the ground under it deepens as it does. */
+.act-about {
+  position: relative;
+  z-index: 3;
+  background: var(--ink);
+  /* Taller than the screen so the settle has something to run on — a
+     section exactly one viewport high gives the engine no travel and
+     the picture snaps instead of arriving — but only just. The excess
+     over one screen is scrolled through as empty ground once the hold
+     releases, so it buys travel at the price of a gap. */
+  height: 135svh;
+}
+.about-hold {
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  display: grid;
+  /* Stretch, not center: centring makes the overlay only as tall as
+     its own content, and the `align-content: end` inside it then has
+     no room to push anything anywhere. */
+  align-items: stretch;
+  overflow: clip;
+}
+/* Defaults live on the section, which is where the engine writes. */
+.act-about {
+  --settle: 1;
+  --dark: 0.5;
+}
+.about-stage {
+  position: absolute;
+  inset: 0;
+  grid-area: 1 / 1;
+}
+.about-stage picture { display: block; width: 100%; height: 100%; }
+.about-stage img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(var(--settle));
+  will-change: transform;
+}
+.about-veil {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  /* Up from the foot, not across from the left. A side gel put the
+     words on a black panel and left the house stranded on the right
+     as a separate object; this way the ground the words stand on is
+     the bottom of the photograph itself. */
+  background:
+    linear-gradient(
+      to top,
+      rgba(var(--scrim), 0.96) 0%,
+      rgba(var(--scrim), 0.9) 26%,
+      rgba(var(--scrim), 0.62) 46%,
+      rgba(var(--scrim), 0.12) 72%,
+      rgba(var(--scrim), 0.3) 100%
+    ),
+    linear-gradient(to right, rgba(var(--scrim), 0.5) 0%, rgba(var(--scrim), 0) 34%);
+}
+
+/* Low in the frame, not centred in it. Every other act on the page
+   used to set its first line at the same height and the same x, and
+   that sameness is what read as a template. Here the words sit on the
+   floor of the picture, under the building. */
+.about-ui {
+  position: relative;
+  grid-area: 1 / 1;
+  z-index: 2;
+  align-content: end;
+  padding-bottom: clamp(2rem, 7vh, 5rem);
+}
+.about-copy {
+  /* body / -1, not body / air: `air` is the line the air track STARTS
+     at, so body/air is the body track alone and the headline was being
+     squeezed into 608px and breaking to four lines. */
+  grid-column: body / -1;
+  display: grid;
+  gap: var(--s3);
+  max-width: 44rem;
+}
+.about-copy .head { max-width: 18ch; }
+/* Beside the headline rather than under it: the measure is short, and
+   stacked it pushed the whole block too far up the frame. */
+.about-copy .lead { max-width: 34ch; }
+
+@media (min-width: 1100px) {
+  .about-copy {
+    grid-template-columns: minmax(0, 1.45fr) minmax(0, 0.8fr);
+    align-items: end;
+    column-gap: clamp(2rem, 4vw, 4rem);
+    max-width: 58rem;
+  }
+  .about-copy .lead { margin-bottom: 0.35rem; }
+}
+
+@media (max-width: 1100px) {
+  /* A left-to-right gel does nothing on a narrow screen — the copy
+     runs the full width, so the gel has to come up from the foot. */
+  .about-veil {
+    background: linear-gradient(
+      to top,
+      rgba(var(--scrim), 0.94) 0%,
+      rgba(var(--scrim), 0.88) 42%,
+      rgba(var(--scrim), 0.3) 82%
+    );
+  }
+  .about-copy .head,
+  .about-copy .lead { max-width: none; }
+}
+@media (max-width: 899px) {
+  .about-copy { grid-column: 1; }
+}
+
+
+/* ---------- ACT VII — the last frame -------------------------------- */
+
+.act-last { z-index: 7; }
+/* 130, not 170. A sticky stage leaves a dead run behind it: the track
+   is taller than the stage by design, to give the settle somewhere to
+   happen, and once the stage un-pins the visitor scrolls through the
+   difference as empty ground. At 170svh that was 630px of nothing
+   before the footer. Measured by scanning the page for rows with
+   nothing in them. */
+.act-last .track { height: 130svh; }
+.act-last .stage { background: var(--ink); }
+.last-frame { position: absolute; inset: 0; }
+.last-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 56% 58%;
+  transform: scale(var(--settle, 1.12));
+}
+.last-veil { position: absolute; inset: 0; background: rgba(var(--scrim), var(--dark, 0.3)); }
+
+.last-words {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: clamp(4rem, 14svh, 9rem);
+  /* The channels are written to .about-stage, so they are read back
+     off the section, which is the common ancestor of both. */
+  opacity: var(--words, 1);
+  transform: translateY(calc(var(--words-y, 0) * 1px));
+}
+.last-words h2 { max-width: 22ch; }
+.last-cta { opacity: var(--cta, 1); pointer-events: var(--cta-pe, auto); }
+
+/* ==================================================================
+   FINISH PASS
+
+   Generated imagery has a tell that has nothing to do with content:
+   it is too clean. No sensor noise, no gate weave, perfectly smooth
+   gradients in the sky and in the shadows. Eyes read that as render
+   even when they cannot say why.
+
+   So the pictures get finished the way a colourist would finish them:
+   a fine monochrome grain laid over every frame, and a breath of
+   vignette on the full-bleed ones. One tiled SVG and a radial
+   gradient — no filters, nothing per-pixel at runtime.
+
+   It does a second job too. The assets come from two sources with
+   different render characteristics; a common grain is what makes them
+   look like one body of work rather than a folder.
+   ================================================================== */
+
+:root {
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+}
+
+.frame::before,
+.last-frame::before,
+.pause-media::before,
+.about-media::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background-image: var(--grain);
+  background-size: 140px 140px;
+  mix-blend-mode: overlay;
+  opacity: 0.38;
+}
+
+/* Full-bleed frames also get the falloff a lens would give them. Small
+   panels do not — a vignette inside a 22vw frame reads as a filter
+   rather than as optics. */
+.last-frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(
+    124% 94% at 50% 46%,
+    rgba(var(--scrim), 0) 52%,
+    rgba(var(--scrim), 0.32) 100%
+  );
+}
+
+/* Stacking order inside a stage, bottom to top:
+     0  the picture
+     1  the finish pass (grain, vignette)
+     2  the veils that make type legible
+     3  type and controls
+   The veils are decoration and must never swallow a click — giving one a
+   z-index without this made the resort CTA unreachable. */
+.last-veil, .world-veil {
+  z-index: 2;
+  pointer-events: none;
+}
+.frame-open { z-index: 3; }
+.resort-copy, .last-words { z-index: 3; }
+
+/* The grain is texture, not decoration — it must not survive into the
+   modes people turn on in order to be able to read at all. */
+@media (prefers-contrast: more), (forced-colors: active) {
+  .frame::before, .last-frame::before, .world-layer::before,
+  .pause-media::before, .about-media::before, .last-frame::after {
+    display: none;
+  }
+}
+
+/* ==================================================================
+   WORLDS AND PASSAGES
+
+   A world is a full-bleed picture. A passage is the move through an
+   opening in it into the next one. Both layers are driven entirely by
+   transform and clip-path, written per frame by WorldChain, so nothing
+   here animates on its own — the stylesheet only sets the stage.
+   ================================================================== */
+
+.chain .stage { background: var(--ink); }
+
+.world-slot {
+  position: absolute;
+  inset: 0;
+  will-change: transform, clip-path, opacity;
+  /* backface-visibility stops Chrome resampling the scaled layer on
+     every frame, which shows up as a shimmer on the fine foliage. */
+  backface-visibility: hidden;
+}
+
+.world-layer { position: absolute; inset: 0; }
+.world-layer img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* The finish pass applies here too: generated frames are too clean, and
+   a flown-through frame shows it most. */
+.world-layer::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background-image: var(--grain);
+  background-size: 140px 140px;
+  mix-blend-mode: overlay;
+  opacity: 0.38;
+}
+.world-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: radial-gradient(
+    124% 94% at 50% 46%,
+    rgba(var(--scrim), 0) 52%,
+    rgba(var(--scrim), 0.34) 100%
+  );
+}
+
+/* Calibration only — drawn with ?apertures=1. */
+.aperture-guide {
+  position: absolute;
+  z-index: 60;
+  border: 2px solid #00ff88;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6) inset;
+  pointer-events: none;
+}
+.aperture-guide span {
+  position: absolute;
+  left: 0;
+  top: -1.4rem;
+  white-space: nowrap;
+  font: 600 11px/1 ui-monospace, monospace;
+  letter-spacing: 0.04em;
+  color: #00ff88;
+  text-shadow: 0 0 4px #000;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* No passages. The chain becomes a plain vertical run of pictures. */
+  .chain .track { height: auto !important; }
+  .chain .stage { position: static; height: auto; display: grid; gap: 1rem; padding: var(--s5) var(--gutter); }
+  .world-slot {
+    position: relative;
+    inset: auto;
+    aspect-ratio: 16 / 9;
+    transform: none !important;
+    clip-path: none !important;
+    opacity: 1 !important;
+  }
+  .aperture-guide { display: none; }
+}
+
+/* ---------- Viewer --------------------------------------------------- */
+
+.viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: grid;
+  place-items: center;
+  padding: clamp(1rem, 4vw, 3rem);
+  background: rgba(var(--scrim), 0.97);
+  animation: fade-in 0.35s var(--ease) both;
+  touch-action: pan-y;
+}
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+.viewer-frame {
+  width: min(100%, 1280px);
+  animation: viewer-step 0.5s var(--ease-film) both;
+}
+.viewer-frame[data-dir="-1"] { animation-name: viewer-step-back; }
+@keyframes viewer-step { from { opacity: 0; transform: translateX(3%); } to { opacity: 1; transform: none; } }
+@keyframes viewer-step-back { from { opacity: 0; transform: translateX(-3%); } to { opacity: 1; transform: none; } }
+
+.viewer-frame video,
+.viewer-frame img {
+  width: 100%;
+  max-height: 78svh;
+  object-fit: contain;
+  background: #000;
+  margin-inline: auto;
+}
+
+.viewer-close,
+.viewer-step {
+  position: fixed;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: var(--ivory);
+  opacity: 0.65;
+  transition: opacity 0.3s var(--ease), color 0.3s var(--ease);
+}
+.viewer-close svg, .viewer-step svg {
+  width: 20px; height: 20px;
+  stroke: currentColor; stroke-width: 1.3; fill: none;
+}
+.viewer-close { top: clamp(1rem, 3vw, 2rem); right: clamp(1rem, 3vw, 2rem); width: 48px; height: 48px; }
+.viewer-step { top: 50%; width: 56px; height: 56px; transform: translateY(-50%); }
+.viewer-step[data-side="prev"] { left: clamp(0.25rem, 2vw, 1.5rem); }
+.viewer-step[data-side="next"] { right: clamp(0.25rem, 2vw, 1.5rem); }
+.viewer-close:hover, .viewer-step:hover,
+.viewer-close:focus-visible, .viewer-step:focus-visible { opacity: 1; color: var(--accent); }
+
+.viewer-dots {
+  position: fixed;
+  left: 50%;
+  bottom: clamp(1rem, 3vh, 2rem);
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0.45rem;
+}
+.viewer-dots span {
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: rgba(240, 236, 228, 0.3);
+  transition: background 0.35s var(--ease);
+}
+.viewer-dots span[data-on="true"] { background: var(--accent); }
+
+/* ---------- Contact panel -------------------------------------------- */
+
+.enquiry-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 320;
+  background: rgba(var(--scrim), 0.72);
+  backdrop-filter: blur(6px);
+  display: grid;
+  justify-items: end;
+  animation: fade-in 0.3s var(--ease) both;
+}
+.enquiry {
+  position: relative;
+  width: min(34rem, 100%);
+  height: 100%;
+  overflow-y: auto;
+  background: var(--ink);
+  border-left: 1px solid var(--line-dark);
+  animation: enquiry-in 0.55s var(--ease-film) both;
+  padding-top: env(safe-area-inset-top, 0px);
+}
+@keyframes enquiry-in { from { transform: translateX(100%); } to { transform: none; } }
+
+.enquiry-body {
+  display: grid;
+  gap: var(--s3);
+  padding: clamp(3.5rem, 8vh, 5rem) var(--s4) var(--s5);
+}
+.enquiry-close {
+  position: absolute;
+  top: calc(0.75rem + env(safe-area-inset-top, 0px));
+  right: 0.75rem;
+  width: 48px; height: 48px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: var(--ivory);
+  opacity: 0.7;
+  transition: opacity 0.3s var(--ease), color 0.3s var(--ease);
+}
+.enquiry-close svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 1.3; fill: none; }
+.enquiry-close:hover, .enquiry-close:focus-visible { opacity: 1; color: var(--accent); }
+
+/* ---------- Form ------------------------------------------------------ */
+
+.form { display: grid; gap: var(--s3); margin-top: var(--s2); }
+.form-row { display: grid; gap: var(--s3); }
+@media (min-width: 30rem) { .form-row { grid-template-columns: 1fr 1fr; } }
+
+.field { display: grid; gap: 0.45rem; }
+.field > label {
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(240, 236, 228, 0.72);
+}
+.field input, .field select, .field textarea {
+  width: 100%;
+  padding: 0.85rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--line-dark);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ivory);
+  font-size: 1rem;
+  transition: border-color 0.35s var(--ease);
+  -webkit-appearance: none;
+  appearance: none;
+}
+.field select {
+  padding-right: 1.6rem;
+  background-image: linear-gradient(45deg, transparent 50%, var(--accent) 50%),
+    linear-gradient(135deg, var(--accent) 50%, transparent 50%);
+  background-position: right 0.55rem center, right 0.25rem center;
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+.field select option { background: var(--ink); color: var(--ivory); }
+.field textarea { resize: vertical; min-height: 7rem; line-height: 1.55; }
+.field input:focus, .field select:focus, .field textarea:focus {
+  outline: none;
+  border-bottom-color: var(--accent);
+}
+.field input:focus-visible, .field select:focus-visible, .field textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+/* Deliberately below body contrast: a placeholder at full legibility
+   reads as a value someone already typed. */
+.field input::placeholder, .field textarea::placeholder { color: rgba(240, 236, 228, 0.45); }
+.field[data-invalid="true"] input,
+.field[data-invalid="true"] select,
+.field[data-invalid="true"] textarea { border-bottom-color: var(--accent); }
+.field-error { font-size: 0.76rem; color: var(--accent); }
+
+.form-foot { display: flex; flex-wrap: wrap; gap: var(--s3); padding-top: var(--s1); }
+.form-status { font-size: 0.86rem; line-height: 1.55; min-height: 1.4em; }
+.form-status[data-kind="error"] { color: var(--accent); }
+
+.hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+
+/* ---------- Footer ----------------------------------------------------- */
+
+.foot {
+  position: relative;
+  z-index: 8;
+  background: var(--ink);
+  /* No rule. The act above it ends on a full-bleed picture, so there
+     is already a hard edge; a hairline on top of one is the kind of
+     furniture that made every section look the same. Space does it. */
+  padding: var(--s5) var(--gutter) calc(var(--s4) + env(safe-area-inset-bottom, 0px));
+  display: grid;
+  gap: var(--s3);
+}
+/* The rail is fixed and reaches the bottom of the viewport, so the footer
+   has to clear it like everything else — otherwise it scrolls up
+   underneath the rail's own foot and the two sets of type collide. */
+@media (min-width: 1100px) {
+  .foot { padding-left: calc(var(--rail-w) + var(--gutter) * 2); }
+}
+.foot > * { width: min(var(--max), 100%); margin-inline: auto; }
+.foot-note {
+  font-size: 0.72rem;
+  line-height: 1.65;
+  color: rgba(240, 236, 228, 0.6);
+  max-width: 68ch;
+}
+.foot-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s3);
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(240, 236, 228, 0.62);
+}
+.foot-row a:hover { color: var(--ivory); }
+
+/* ---------- Phone ----------------------------------------------------
+   The wide layout already stacks. What a phone still needs is a name
+   you can see, type you can read, and controls a thumb can hit.
+   ------------------------------------------------------------------- */
+
+@media (max-width: 760px) {
+  .cta { font-size: 0.8rem; letter-spacing: 0.14em; }
+  .fine-print { font-size: 0.8rem; }
+  .vp-term { font-size: 0.72rem; }
+  .vp-copy { font-size: 1rem; }
+  .vp-price { font-size: 0.95rem; }
+  .inst-coord { font-size: 0.9rem; }
+  .foot-note { font-size: 0.84rem; }
+  .foot-row { font-size: 0.75rem; letter-spacing: 0.08em; }
+  .foot-row a {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* The opening and the close should clear the home indicator, and
+     they should not ask for a second screen of the same picture. */
+  .arrival-type {
+    bottom: calc(clamp(2.25rem, 7svh, 3.5rem) + env(safe-area-inset-bottom, 0px));
+  }
+  .act-resort .resort-copy,
+  .resort-copy {
+    bottom: calc(clamp(2.5rem, 8svh, 4.5rem) + env(safe-area-inset-bottom, 0px));
+  }
+  .last-words {
+    bottom: calc(clamp(2.5rem, 10svh, 5rem) + env(safe-area-inset-bottom, 0px));
+  }
+  .act-about { height: 118svh; }
+  .act-last .track { height: 115svh; }
+
+  .gate-hold {
+    padding-top: calc(4.5rem + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(var(--s4) + env(safe-area-inset-bottom, 0px));
+  }
+
+  .pill { width: 44px; height: 44px; }
+  /* The program row is tall. Letting the video fill it letterboxes a
+     wide shot inside a black well and pushes the controls away from
+     the picture. Size the frame to the shot and keep the bar under it. */
+  .program { grid-template-rows: auto auto; align-content: end; }
+  .program video { height: auto; max-height: 56svh; }
+  .program-bar { min-width: 0; }
+  .scrub { min-width: 0; }
+  .clock { font-size: 0.75rem; }
+  .strip-frame { width: 112px; }
+  .screening {
+    padding-top: calc(5rem + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(5.25rem + env(safe-area-inset-bottom, 0px));
+    gap: 0.75rem;
+  }
+  .world-chrome { bottom: calc(0.35rem + env(safe-area-inset-bottom, 0px)); }
+
+  .enquiry { border-left: 0; }
+  .enquiry-body {
+    padding-top: calc(4.25rem + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(var(--s4) + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* ======================================================================
+   NARROW SCREENS — a different motion system, not a smaller one.
+
+   The rail is abandoned. The reel becomes a vertical run of full-width
+   frames, and the entrance work is handed to scroll-driven animations
+   where the browser supports them, so phones get motion that costs
+   nothing on the main thread.
+   ====================================================================== */
+
+@media (max-width: 819px) {
+  .act-reel .track { height: auto !important; }
+  .act-reel .stage { position: static; height: auto; overflow: visible; }
+
+
+
+  .act-resort .track { height: 360svh; }
+  /* The words sit at the foot of the frame, where the veil is deepest,
+     and still clear on the same timeline as on a wide screen. */
+  .resort-copy {
+    top: auto;
+    bottom: clamp(3rem, 10svh, 6rem);
+    transform: translateY(calc(var(--copy-y, 0) * -0.6svh));
+    max-width: 100%;
+  }
+  .scene-veil {
+    background: linear-gradient(to top,
+      rgba(var(--scrim), 0.94) 0%,
+      rgba(var(--scrim), 0.8) 26%,
+      rgba(var(--scrim), 0.34) 54%,
+      rgba(var(--scrim), 0.08) 80%);
+  }
+
+  .viewer-step { width: 48px; height: 48px; }
+}
+
+/* Scroll-driven entrances for the vertical reel. No JS, no main-thread
+   cost, and silently ignored by browsers that do not support it. */
+
+/* ======================================================================
+   REDUCED MOTION — the film becomes a document.
+
+   No stage is registered with the scroll engine, so every custom property
+   falls back to its resting value. Sticky is dropped, the rail is laid out
+   vertically, and the resort scenes stack. Nothing is hidden and nothing
+   depends on scrolling.
+   ====================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  [data-reveal] { opacity: 1 !important; transform: none !important; }
+  [data-reveal]::after { display: none !important; }
+
+  .stage { position: static; height: auto; overflow: visible; }
+  .act-reel .track,
+  .act-resort .track,
+  .act-last .track { height: auto !important; }
+
+  /* The gate stops being a track. Left as one it kept 810px of scroll
+     that did nothing, because the flow is driven by a channel the
+     engine never registers here — and the eight frames never arrived
+     at all. They are simply in place instead. */
+  .gate { height: auto; }
+  .gate-hold { position: static; overflow: visible; }
+  .gate-stage { transform: none; }
+  .gate-drift { opacity: 0.92; transform: none; }
+
+  /* The instrument still works; it cuts instead of wiping, and the
+     leaders and notes appear without drawing themselves. */
+  .inst-plate[data-state="in"] picture { animation: none !important; clip-path: none !important; }
+  .inst-plate[data-state="out"] { display: none !important; }
+  .vp-leader { transform: scaleX(1) !important; }
+
+  /* About stops being a held stage: the picture is simply the ground
+     the two sentences sit on, at its own height. */
+  .act-about { height: auto; }
+  .about-hold { position: static; height: auto; min-height: 100svh; }
+  .about-stage img { transform: none; }
+
+
+
+
+
+  /* The resort scenes become a plain vertical sequence. */
+  .act-resort .stage { display: grid; }
+  .act-resort .scene { position: relative; inset: auto; opacity: 1 !important; aspect-ratio: 16 / 9; }
+  .act-resort .scene img { transform: none; }
+  .scene-veil { display: none; }
+  .resort-copy {
+    position: relative;
+    inset: auto;
+    opacity: 1 !important;
+    transform: none !important;
+    margin-inline: auto;
+    padding-block: var(--s4);
+    max-width: var(--max);
+  }
+
+  .last-frame { position: relative; aspect-ratio: 16 / 9; }
+  .last-frame img { transform: none; }
+  .last-veil { background: rgba(var(--scrim), 0.45); }
+  .last-words {
+    position: relative;
+    inset: auto;
+    opacity: 1 !important;
+    transform: none !important;
+    padding: var(--s4) 0;
+    margin-inline: auto;
+  }
+  .last-cta { opacity: 1 !important; }
+
+  .pause-media img, .about-media img { transform: none; object-position: 50% 50%; }
+  .frame-inner video { display: none; }
+}
+
+/* Without JavaScript the reveal attributes never resolve. */
+html:not(.js) [data-reveal] { opacity: 1; transform: none; }
+html:not(.js) [data-reveal]::after { display: none; }
+
