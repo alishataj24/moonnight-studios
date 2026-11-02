@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import { contact } from "../data/content"
 import { sections, studio } from "../data/studio"
 import type { WorldId } from "./PortalGate"
 
@@ -68,6 +69,11 @@ export function SiteRail({
     return () => document.removeEventListener("keydown", onKey)
   }, [open])
 
+  const startProject = () => {
+    setOpen(false)
+    onContact()
+  }
+
   const items = sections.map((item, i) => {
     const onClick = (event: React.MouseEvent) => {
       setOpen(false)
@@ -92,6 +98,15 @@ export function SiteRail({
     )
   })
 
+  const startControl = (className = "rail-start") => (
+    <button type="button" className={className} onClick={startProject}>
+      {contact.cta}
+      <span className="arrow" aria-hidden="true">
+        ↗
+      </span>
+    </button>
+  )
+
   return (
     <>
       <header className="rail">
@@ -104,26 +119,32 @@ export function SiteRail({
         <p className="rail-foot">Independent creative production</p>
       </header>
 
+      <div className="rail-start-desk">{startControl()}</div>
+
       <header className="mobile-bar">
         <a className="bar-mark" href="#top" onClick={() => setOpen(false)}>
           <img src="/brand/mark.png" alt="" />
           <span>{studio.wordmark}</span>
         </a>
 
-        <button
-          ref={toggleRef}
-          type="button"
-          className="rail-toggle"
-          aria-expanded={open}
-          aria-controls="rail-sheet"
-          onClick={() => setOpen((v) => !v)}
-        >
-          {open ? "Close" : "Menu"}
-        </button>
+        <div className="bar-actions">
+          {startControl()}
+          <button
+            ref={toggleRef}
+            type="button"
+            className="rail-toggle"
+            aria-expanded={open}
+            aria-controls="rail-sheet"
+            onClick={() => setOpen((v) => !v)}
+          >
+            {open ? "Close" : "Menu"}
+          </button>
+        </div>
       </header>
 
       <div className="rail-sheet" id="rail-sheet" data-open={open} inert={!open}>
         {items}
+        {startControl("rail-start rail-start-sheet")}
       </div>
     </>
   )

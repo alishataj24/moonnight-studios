@@ -411,6 +411,63 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   line-height: 1.7;
 }
 
+/* Always within reach: top-right on desktop, in the phone bar on narrow. */
+.rail-start {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 44px;
+  padding: 0 1.15rem;
+  border: 0;
+  background: var(--ivory);
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: background 0.35s var(--ease), color 0.35s var(--ease);
+}
+.rail-start:hover,
+.rail-start:focus-visible {
+  background: var(--accent);
+}
+.rail-start .arrow {
+  display: inline-block;
+  transition: transform 0.45s var(--ease-film);
+}
+.rail-start:hover .arrow,
+.rail-start:focus-visible .arrow {
+  transform: translate(0.18em, -0.18em);
+}
+
+.rail-start-desk {
+  display: none;
+  position: fixed;
+  z-index: 110;
+  top: calc(1.1rem + env(safe-area-inset-top, 0px));
+  right: var(--gutter);
+  pointer-events: none;
+}
+.rail-start-desk > * {
+  pointer-events: auto;
+}
+
+.bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex: none;
+  min-width: 0;
+}
+
+.rail-start-sheet {
+  margin-top: 1.4rem;
+  justify-self: start;
+  min-height: 48px;
+}
+
 /* Narrow: no margin to live in, so it becomes a bar and a sheet. */
 .rail-toggle {
   position: fixed;
@@ -457,6 +514,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 @media (min-width: 1100px) {
   .rail { display: grid; }
   .rail-toggle, .rail-sheet { display: none; }
+  .rail-start-desk { display: block; }
 }
 
 /* One row once the rail is gone: mark, name, menu. A scrim fades
@@ -506,6 +564,11 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
     pointer-events: none;
   }
   .mobile-bar > * { pointer-events: auto; }
+  .mobile-bar .rail-start {
+    padding-inline: 0.85rem;
+    font-size: 0.62rem;
+    letter-spacing: 0.12em;
+  }
   .rail-toggle {
     position: static;
     top: auto;
@@ -523,6 +586,13 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
     min-height: 48px;
     display: flex;
     align-items: center;
+  }
+}
+
+@media (max-width: 420px) {
+  .bar-mark span { display: none; }
+  .mobile-bar .rail-start {
+    padding-inline: 0.75rem;
   }
 }
 
