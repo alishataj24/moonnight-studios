@@ -2419,6 +2419,29 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   color: rgba(240, 236, 228, 0.62);
 }
 .foot-row a:hover { color: var(--ivory); }
+.foot-socials {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+.foot-social {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  color: rgba(240, 236, 228, 0.62);
+  transition: color 0.3s var(--ease);
+}
+.foot-social:hover,
+.foot-social:focus-visible {
+  color: var(--ivory);
+}
+.foot-social svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  display: block;
+}
 
 /* ---------- Phone ----------------------------------------------------
    The wide layout already stacks. What a phone still needs is a name
