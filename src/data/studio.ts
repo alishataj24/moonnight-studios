@@ -15,7 +15,10 @@ export const studio = {
   siteUrl: (import.meta.env.VITE_SITE_URL ?? "").replace(/\/$/, ""),
   email: "",
   whatsapp: "919019863943",
-  social: [] as { label: string; href: string }[],
+  social: [
+    { label: "Instagram", href: "https://www.instagram.com/moonnight_studios/" },
+    { label: "LinkedIn", href: "https://www.linkedin.com/company/moonnightstudios/" },
+  ],
 } as const
 
 /** Nav targets. Every one must exist in the DOM — a nav item pointing
