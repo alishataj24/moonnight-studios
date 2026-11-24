@@ -30,6 +30,7 @@ export const sections = [
   { id: "work", label: "Work", world: null },
   { id: "work", label: "Images", world: "images" },
   { id: "work", label: "Films", world: "films" },
+  { id: "work", label: "Sites", world: "sites" },
   { id: "resorts", label: "For Resorts", world: null },
   { id: "about", label: "About", world: null },
   { id: "contact", label: "Contact", world: null },

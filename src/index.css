@@ -813,11 +813,20 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 }
 .gate-field[data-world="films"] {
   right: 0;
-  bottom: 0;
-  width: 62%;
-  height: 74%;
+  top: 0;
+  width: 48%;
+  height: 62%;
   z-index: 1;
   transform: translate3d(calc(var(--mx) * 14px), calc(var(--my) * 10px), 0);
+}
+.gate-field[data-world="sites"] {
+  left: 18%;
+  right: 8%;
+  bottom: 0;
+  width: auto;
+  height: 42%;
+  z-index: 2;
+  transform: translate3d(calc(var(--mx) * 8px), calc(var(--my) * 12px), 0);
 }
 
 .gate-media {
@@ -849,6 +858,11 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   transition: opacity 1.1s var(--ease);
 }
 .gate-media picture[data-on] { opacity: 1; }
+.gate-field[data-world="sites"] .gate-media > img {
+  opacity: 0;
+  transition: opacity 1.1s var(--ease);
+}
+.gate-field[data-world="sites"] .gate-media > img[data-on] { opacity: 1; }
 /* A floor for the name. Both fields put a word at their foot and both
    can have a bright picture under it — "Images" over sunlit grass was
    unreadable. */
@@ -902,6 +916,22 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   right: clamp(1rem, 2.2vw, 2rem);
   bottom: clamp(0.75rem, 1.8vw, 1.5rem);
 }
+.gate-field[data-world="sites"] .gate-label {
+  left: clamp(1rem, 2.2vw, 2rem);
+  bottom: clamp(0.75rem, 1.8vw, 1.5rem);
+}
+.gate-site-name {
+  position: absolute;
+  z-index: 2;
+  right: clamp(1rem, 2.2vw, 2rem);
+  bottom: clamp(0.95rem, 2vw, 1.7rem);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(240, 236, 228, 0.72);
+  pointer-events: none;
+}
 /* A rule that draws itself under the name on approach. The only mark
    on the two fields, and it only exists while you are reaching for
    one — it is feedback, not furniture. */
@@ -921,21 +951,30 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .gate-field:hover .gate-label::after,
 .gate-field:focus-visible .gate-label::after { transform: scaleX(1); }
 
-/* Approach: the near field comes forward and opens; the far one cools
-   and recedes. Focus drives the identical state for the keyboard. */
+/* Approach: the near field comes forward and opens; the far ones cool
+   and recede. Focus drives the identical state for the keyboard. */
 .gate-stage[data-near="images"] .gate-field[data-world="images"],
-.gate-stage[data-near="films"] .gate-field[data-world="films"] { z-index: 3; }
+.gate-stage[data-near="films"] .gate-field[data-world="films"],
+.gate-stage[data-near="sites"] .gate-field[data-world="sites"] { z-index: 3; }
 .gate-stage[data-near="images"] .gate-field[data-world="images"] .gate-media img,
-.gate-stage[data-near="films"] .gate-field[data-world="films"] .gate-media video {
+.gate-stage[data-near="films"] .gate-field[data-world="films"] .gate-media video,
+.gate-stage[data-near="sites"] .gate-field[data-world="sites"] .gate-media img {
   transform: scale(1);
 }
-.gate-stage[data-near="images"] .gate-field[data-world="films"],
-.gate-stage[data-near="films"] .gate-field[data-world="images"] {
+.gate-stage[data-near="images"] .gate-field:not([data-world="images"]),
+.gate-stage[data-near="films"] .gate-field:not([data-world="films"]),
+.gate-stage[data-near="sites"] .gate-field:not([data-world="sites"]) {
   filter: saturate(0.5) brightness(0.62);
   opacity: 0.8;
 }
-.gate-stage[data-near="images"] .gate-field[data-world="films"] .gate-label,
-.gate-stage[data-near="films"] .gate-field[data-world="images"] .gate-label { opacity: 0.45; }
+.gate-stage[data-near="images"] .gate-field:not([data-world="images"]) .gate-label,
+.gate-stage[data-near="films"] .gate-field:not([data-world="films"]) .gate-label,
+.gate-stage[data-near="sites"] .gate-field:not([data-world="sites"]) .gate-label,
+.gate-stage[data-near="images"] .gate-field:not([data-world="images"]) .gate-site-name,
+.gate-stage[data-near="films"] .gate-field:not([data-world="films"]) .gate-site-name,
+.gate-stage[data-near="sites"] .gate-field:not([data-world="sites"]) .gate-site-name {
+  opacity: 0.45;
+}
 
 /* ---- The work flowing in ---------------------------------------
 
@@ -1020,6 +1059,13 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
     right: auto;
     left: clamp(0.9rem, 4vw, 1.5rem);
     bottom: clamp(0.7rem, 3vw, 1.2rem);
+  }
+  .gate-stage .gate-field[data-world="sites"] {
+    aspect-ratio: 16 / 10;
+  }
+  .gate-site-name {
+    right: clamp(0.9rem, 4vw, 1.5rem);
+    bottom: clamp(0.85rem, 3vw, 1.35rem);
   }
   .gate-stage { gap: 1.6rem; }
   .gate-media img, .gate-media video { transform: scale(1); }
@@ -1216,6 +1262,147 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
      phone the satellites would be thumbnails too small to hit. */
   .exhibition .plate { width: min(86vw, 62svh * var(--ar, 1.5)); }
   .exhibition .plate:not([data-hero]) { opacity: 0; pointer-events: none; }
+}
+
+/* ---------- SITES — the product room ----------------------------- */
+
+.sites-room {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: clamp(1.2rem, 3vh, 2.2rem);
+  padding:
+    calc(4.5rem + env(safe-area-inset-top, 0px))
+    var(--gutter)
+    calc(5.2rem + env(safe-area-inset-bottom, 0px));
+  color: var(--ivory);
+}
+.sites-stage {
+  display: grid;
+  grid-template-columns: minmax(14rem, 0.9fr) minmax(0, 1.6fr);
+  gap: clamp(1.4rem, 4vw, 3.5rem);
+  align-items: end;
+  min-height: 0;
+}
+.sites-copy {
+  display: grid;
+  align-content: end;
+  gap: 0.85rem;
+  max-width: 28rem;
+  padding-bottom: 0.4rem;
+}
+.sites-kind {
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(240, 236, 228, 0.5);
+}
+.sites-name {
+  font-family: var(--face);
+  font-size: clamp(2.2rem, 5vw, 4.2rem);
+  font-weight: 300;
+  letter-spacing: -0.035em;
+  line-height: 1.02;
+}
+.sites-line {
+  font-size: clamp(0.98rem, 1.5vw, 1.15rem);
+  line-height: 1.55;
+  color: rgba(240, 236, 228, 0.78);
+  max-width: 34ch;
+}
+.sites-open {
+  justify-self: start;
+  margin-top: 0.4rem;
+}
+.sites-count {
+  font-size: 0.66rem;
+  letter-spacing: 0.18em;
+  color: rgba(240, 236, 228, 0.42);
+  font-variant-numeric: tabular-nums;
+}
+.sites-surface {
+  position: relative;
+  display: block;
+  min-height: 0;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #0a1018;
+  box-shadow:
+    0 0 0 1px rgba(240, 236, 228, 0.08),
+    0 28px 80px rgba(0, 0, 0, 0.45);
+}
+.sites-surface img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  display: block;
+}
+.sites-surface:hover img,
+.sites-surface:focus-visible img {
+  transform: scale(1.02);
+}
+.sites-surface img {
+  transition: transform 1s var(--ease-film);
+}
+.sites-index {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(7.5rem, 1fr);
+  gap: 0.65rem;
+  overflow-x: auto;
+  padding-bottom: 0.2rem;
+  scrollbar-width: none;
+}
+.sites-index::-webkit-scrollbar { display: none; }
+.sites-thumb {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: rgba(240, 236, 228, 0.55);
+  text-align: left;
+  cursor: pointer;
+  display: grid;
+  gap: 0.45rem;
+}
+.sites-thumb img {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  object-position: top center;
+  opacity: 0.55;
+  filter: saturate(0.7);
+  transition: opacity 0.4s var(--ease), filter 0.4s var(--ease);
+}
+.sites-thumb span {
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.sites-thumb[data-on] { color: var(--ivory); }
+.sites-thumb[data-on] img,
+.sites-thumb:hover img,
+.sites-thumb:focus-visible img {
+  opacity: 1;
+  filter: none;
+}
+
+@media (max-width: 900px) {
+  .sites-stage {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    gap: 1.2rem;
+  }
+  .sites-copy {
+    order: 2;
+    align-content: start;
+    max-width: none;
+  }
+  .sites-surface { order: 1; }
+  .sites-index {
+    grid-auto-columns: minmax(6.2rem, 38vw);
+  }
 }
 
 /* ---------- FILMS — the screening room --------------------------- */

@@ -109,5 +109,6 @@ export const contact = {
  * do not relabel speculative work as commissioned.
  */
 export const disclosures = [
-  "All work here is self-initiated concept work. No image shows a real property.",
+  "Images and films are self-initiated concept work. No image shows a real property.",
+  "Sites are commissioned product work for the companies named.",
 ]

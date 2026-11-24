@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { piece } from "../data/media"
 import { gatePreview } from "../data/rooms"
+import { sites } from "../data/sites"
 import { q, registerStage, span } from "../motion/stage"
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion"
 
@@ -36,7 +37,7 @@ import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion"
  * its own cue from it in the stylesheet.
  */
 
-export type WorldId = "images" | "films"
+export type WorldId = "images" | "films" | "sites"
 
 /** How long a still holds before the next one fades up. */
 const STILL_MS = 4200
@@ -52,12 +53,14 @@ export function PortalGate({ onEnter }: { onEnter: (world: WorldId) => void }) {
   const [onScreen, setOnScreen] = useState(false)
   const [still, setStill] = useState(0)
   const [clip, setClip] = useState(0)
+  const [site, setSite] = useState(0)
   const reduced = usePrefersReducedMotion()
 
   const stills = gatePreview.images.map((id) => piece(id)).filter(Boolean)
   const flow = gatePreview.flow.map((id) => piece(id)).filter(Boolean)
   const films = gatePreview.films.map((id) => piece(id)).filter(Boolean)
   const film = films[clip % films.length]
+  const sitePlate = sites[site % sites.length]
 
   useEffect(() => setCoarse(window.matchMedia("(hover: none)").matches), [])
 
@@ -87,6 +90,13 @@ export function PortalGate({ onEnter }: { onEnter: (world: WorldId) => void }) {
     const id = window.setInterval(() => setStill((i) => (i + 1) % stills.length), STILL_MS)
     return () => window.clearInterval(id)
   }, [onScreen, reduced, stills.length])
+
+  // Product surfaces cycle on the Sites field.
+  useEffect(() => {
+    if (!onScreen || reduced || sites.length < 2) return
+    const id = window.setInterval(() => setSite((i) => (i + 1) % sites.length), STILL_MS)
+    return () => window.clearInterval(id)
+  }, [onScreen, reduced])
 
   // Films play, and cut to the next when one finishes.
   useEffect(() => {
@@ -186,7 +196,24 @@ export function PortalGate({ onEnter }: { onEnter: (world: WorldId) => void }) {
           <span className="gate-label">Films</span>
         </button>
 
-        {/* Decorative: the two buttons above are the content and the
+        <button {...fieldProps("sites", "Sites")}>
+          <span className="gate-media">
+            {sites.map((item, i) => (
+              <img
+                key={item.id}
+                src={item.poster}
+                alt=""
+                data-on={i === site || undefined}
+                loading={i === 0 ? "eager" : "lazy"}
+                decoding="async"
+              />
+            ))}
+          </span>
+          <span className="gate-label">Sites</span>
+          {sitePlate && <span className="gate-site-name">{sitePlate.name}</span>}
+        </button>
+
+        {/* Decorative: the destinations above are the content and the
             only things reachable. These are the work arriving. */}
         <div className="gate-flow" aria-hidden="true">
           {flow.map((item, i) => (

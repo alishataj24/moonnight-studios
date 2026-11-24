@@ -12,6 +12,7 @@ import { ImageExhibition } from "./components/ImageExhibition"
 import { PortalGate, type WorldId } from "./components/PortalGate"
 import { SiteFooter } from "./components/SiteFooter"
 import { SiteRail } from "./components/SiteRail"
+import { SitesRoom } from "./components/SitesRoom"
 import { WorldOverlay } from "./components/WorldOverlay"
 import type { Piece } from "./data/portfolio"
 
@@ -41,7 +42,7 @@ export function App() {
   useEffect(() => {
     const read = () => {
       const hash = window.location.hash.replace("#", "")
-      setWorld(hash === "images" || hash === "films" ? hash : null)
+      setWorld(hash === "images" || hash === "films" || hash === "sites" ? hash : null)
     }
     read()
     window.addEventListener("hashchange", read)
@@ -61,8 +62,13 @@ export function App() {
   }, [])
 
   const leave = useCallback(() => {
-    if (window.location.hash === "#images" || window.location.hash === "#films") history.back()
-    else setWorld(null)
+    if (
+      window.location.hash === "#images" ||
+      window.location.hash === "#films" ||
+      window.location.hash === "#sites"
+    ) {
+      history.back()
+    } else setWorld(null)
   }, [])
 
   const openViewer = useCallback((item: Piece, collection: Piece[], origin: DOMRect) => {
@@ -98,6 +104,10 @@ export function App() {
 
       <WorldOverlay label="Films" open={world === "films"} onClose={leave}>
         <FilmScreening onClose={leave} />
+      </WorldOverlay>
+
+      <WorldOverlay label="Sites" open={world === "sites"} onClose={leave}>
+        <SitesRoom onClose={leave} />
       </WorldOverlay>
 
       {view && (
