@@ -13,7 +13,7 @@
 export const studio = {
   wordmark: "Moonnight Studios",
   siteUrl: (import.meta.env.VITE_SITE_URL ?? "").replace(/\/$/, ""),
-  email: "",
+  email: "moonnightstudios5@gmail.com",
   whatsapp: "919019863943",
   social: [
     { label: "Instagram", href: "https://www.instagram.com/moonnight_studios/" },
