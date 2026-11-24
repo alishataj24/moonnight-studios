@@ -5,7 +5,7 @@ export const projectTypes = [
   { value: "hospitality", label: "Resort / hospitality" },
   { value: "architecture", label: "Architecture" },
   { value: "product", label: "Product visuals" },
-  { value: "website", label: "Website" },
+  { value: "website", label: "Website / product" },
   { value: "mobile-app", label: "Mobile app" },
   { value: "portraits", label: "Portraits / lifestyle" },
   { value: "other", label: "Other" },

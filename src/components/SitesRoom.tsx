@@ -6,12 +6,8 @@ import { WorldChrome } from "./ImageExhibition"
 /**
  * SITES — the product room.
  *
- * Same grammar as the last frame and the gate: one full-bleed surface,
- * words standing on it, nothing else. No side panel, no thumbnail strip,
- * no card shadow — those make product work look like a pitch deck.
- *
- * The other products wait as names under the frame, the way a film strip
- * waits under the program. Open site is the only call.
+ * Dark field, the mark in the middle, words at the foot. No page
+ * screenshots — the live site is behind Open site, not the plate.
  */
 export function SitesRoom({ onClose }: { onClose: () => void }) {
   const [index, setIndex] = useState(0)
@@ -46,15 +42,14 @@ export function SitesRoom({ onClose }: { onClose: () => void }) {
     <div className="sites-room">
       <div className="sites-frame">
         {sites.map((item, i) => (
-          <img
+          <div
             key={item.id}
-            className="sites-bleed"
-            src={item.poster}
-            alt={i === index ? item.alt : ""}
+            className="sites-plate"
             data-on={i === index || undefined}
             aria-hidden={i === index ? undefined : true}
-            decoding="async"
-          />
+          >
+            <img src={item.logo} alt={i === index ? item.alt : ""} decoding="async" />
+          </div>
         ))}
         <span className="sites-veil" aria-hidden="true" />
 

@@ -1,9 +1,9 @@
 /**
  * Commissioned product work — websites and apps.
  *
- * Unlike the film and image galleries, these plates name the product and
- * link to it. The lines describe what the product is, not what Moonnight
- * claims about the engagement. Do not invent metrics, awards or roles.
+ * Plates show the product mark, not a screenshot of the live site.
+ * Lines describe what the product is, not what Moonnight claims about
+ * the engagement. Do not invent metrics, awards or roles.
  */
 
 export type SiteWork = {
@@ -14,7 +14,8 @@ export type SiteWork = {
   kind: string
   /** One short line about the product itself. */
   line: string
-  poster: string
+  /** Brand mark on a dark field — not a page capture. */
+  logo: string
   alt: string
 }
 
@@ -25,8 +26,8 @@ export const sites: SiteWork[] = [
     href: "https://www.spiked.ai/",
     kind: "Website",
     line: "Digital colleagues that prepare for, join and follow sales conversations.",
-    poster: "/images/sites/spiked.jpg",
-    alt: "SpikedAI homepage: Digital Colleagues for knowledge professionals.",
+    logo: "/images/sites/logos/spiked.svg",
+    alt: "SpikedAI logo",
   },
   {
     id: "saima",
@@ -34,8 +35,8 @@ export const sites: SiteWork[] = [
     href: "https://saima.ai/",
     kind: "Website & app",
     line: "Adaptive video speed and shared notes, so people watch at the pace they understand.",
-    poster: "/images/sites/saima.jpg",
-    alt: "Saima homepage: AI video speed controller.",
+    logo: "/images/sites/logos/saima.png",
+    alt: "Saima logo",
   },
   {
     id: "broadrange",
@@ -43,8 +44,8 @@ export const sites: SiteWork[] = [
     href: "https://www.broadrange.ai/",
     kind: "Website",
     line: "Agentic AI, digital twins and governance for teams putting intelligence to work.",
-    poster: "/images/sites/broadrange.jpg",
-    alt: "Broadrange AI homepage: Transform your business with intelligent AI.",
+    logo: "/images/sites/logos/broadrange.jpg",
+    alt: "Broadrange AI logo",
   },
   {
     id: "einsteini",
@@ -52,8 +53,8 @@ export const sites: SiteWork[] = [
     href: "https://www.einsteini.ai/",
     kind: "Website & app",
     line: "Context-aware replies, comments and posts that keep a professional voice.",
-    poster: "/images/sites/einsteini.jpg",
-    alt: "Einsteini homepage: Think faster. Build smarter. Engage superhuman.",
+    logo: "/images/sites/logos/einsteini.png",
+    alt: "Einsteini logo",
   },
   {
     id: "regdeed",
@@ -61,7 +62,7 @@ export const sites: SiteWork[] = [
     href: "https://www.regdeed.com/",
     kind: "Website & app",
     line: "Property documents, registration support and listings for buyers and owners.",
-    poster: "/images/sites/regdeed.jpg",
-    alt: "Regdeed homepage: Your property documents.",
+    logo: "/images/sites/logos/regdeed.png",
+    alt: "Regdeed logo",
   },
 ]

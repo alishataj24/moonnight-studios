@@ -23,7 +23,7 @@ export const hero = {
    *                whoever wrote the line and not by the measure.
    */
   headline: "Make them|*feel* it.",
-  support: "Films, visuals and sites for brands that sell experiences.",
+  support: "Realistic AI-powered films and visuals for brands that sell experiences.",
   cta: "Explore our work",
 }
 
@@ -86,7 +86,7 @@ export const viewpoint = {
 export const about = {
   headline: "We make brands look|worth *experiencing*.",
   support:
-    "An independent creative production house making films, visuals and sites for ambitious brands.",
+    "An independent creative production house making cinematic films and visuals for ambitious brands.",
   poster: "/images/aranyaka/stills/stone-house.jpg",
   posterSmall: "/images/aranyaka/stills/stone-house-960.webp",
   alt: "A house of stone, plaster and timber held in the shade of mature trees at low sun.",
@@ -110,5 +110,5 @@ export const contact = {
  */
 export const disclosures = [
   "Images and films are self-initiated concept work. No image shows a real property.",
-  "Sites are commissioned websites and apps for the companies named.",
+  "Sites are commissioned product work for the companies named.",
 ]

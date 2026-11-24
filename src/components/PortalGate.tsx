@@ -196,11 +196,11 @@ export function PortalGate({ onEnter }: { onEnter: (world: WorldId) => void }) {
         </button>
 
         <button {...fieldProps("sites", "Sites")}>
-          <span className="gate-media">
+          <span className="gate-media gate-media-logo">
             {sites.map((item, i) => (
               <img
                 key={item.id}
-                src={item.poster}
+                src={item.logo}
                 alt=""
                 data-on={i === site || undefined}
                 loading={i === 0 ? "eager" : "lazy"}

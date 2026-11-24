@@ -116,7 +116,7 @@ export function SiteRail({
         <nav className="rail-nav" aria-label="Sections">
           {items}
         </nav>
-        <p className="rail-foot">Films · visuals · sites</p>
+        <p className="rail-foot">Independent creative production</p>
       </header>
 
       <div className="rail-start-desk">{startControl()}</div>
