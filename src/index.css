@@ -1250,20 +1250,13 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .sites-room {
   position: absolute;
   inset: 0;
-  display: grid;
-  grid-template-rows: 1fr auto;
-  gap: 1.1rem;
-  padding:
-    calc(3.4rem + env(safe-area-inset-top, 0px))
-    var(--gutter)
-    calc(4.8rem + env(safe-area-inset-bottom, 0px));
   color: var(--ivory);
+  background: #070b12;
 }
 .sites-frame {
-  position: relative;
-  min-height: 0;
+  position: absolute;
+  inset: 0;
   overflow: hidden;
-  background: #070b12;
 }
 .sites-bleed {
   position: absolute;
@@ -1291,18 +1284,18 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   background:
     linear-gradient(
       to top,
-      rgba(7, 11, 18, 0.96) 0%,
-      rgba(7, 11, 18, 0.72) 28%,
-      rgba(7, 11, 18, 0.18) 58%,
-      rgba(7, 11, 18, 0.35) 100%
+      rgba(7, 11, 18, 0.97) 0%,
+      rgba(7, 11, 18, 0.78) 22%,
+      rgba(7, 11, 18, 0.22) 52%,
+      rgba(7, 11, 18, 0.4) 100%
     );
 }
 .sites-words {
   position: absolute;
   z-index: 2;
-  left: clamp(1.1rem, 3vw, 2.4rem);
-  right: clamp(1.1rem, 3vw, 2.4rem);
-  bottom: clamp(1.2rem, 3.2vh, 2.2rem);
+  left: var(--gutter);
+  right: var(--gutter);
+  bottom: calc(5.6rem + env(safe-area-inset-bottom, 0px));
   display: grid;
   gap: 0.55rem;
   max-width: 34rem;
@@ -1315,7 +1308,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 }
 .sites-name {
   font-family: var(--face);
-  font-size: clamp(2.4rem, 6vw, 4.6rem);
+  font-size: clamp(2.6rem, 7vw, 5rem);
   font-weight: 300;
   letter-spacing: -0.04em;
   line-height: 0.98;
@@ -1331,6 +1324,11 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   margin-top: 0.35rem;
 }
 .sites-names {
+  position: absolute;
+  z-index: 3;
+  left: var(--gutter);
+  right: var(--gutter);
+  bottom: calc(3.15rem + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem 1.35rem;
@@ -1357,11 +1355,13 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .sites-name-link[data-on] {
   color: var(--accent);
 }
+.sites-room .world-chrome {
+  bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px));
+}
 
 @media (max-width: 760px) {
-  .sites-room {
-    gap: 0.85rem;
-    padding-top: calc(4.2rem + env(safe-area-inset-top, 0px));
+  .sites-words {
+    bottom: calc(6.4rem + env(safe-area-inset-bottom, 0px));
   }
   .sites-names {
     justify-content: flex-start;
@@ -1369,6 +1369,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
     overflow-x: auto;
     flex-wrap: nowrap;
     scrollbar-width: none;
+    bottom: calc(3.4rem + env(safe-area-inset-bottom, 0px));
   }
   .sites-names::-webkit-scrollbar { display: none; }
   .sites-name-link { white-space: nowrap; }
