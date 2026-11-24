@@ -60,7 +60,6 @@ export function PortalGate({ onEnter }: { onEnter: (world: WorldId) => void }) {
   const flow = gatePreview.flow.map((id) => piece(id)).filter(Boolean)
   const films = gatePreview.films.map((id) => piece(id)).filter(Boolean)
   const film = films[clip % films.length]
-  const sitePlate = sites[site % sites.length]
 
   useEffect(() => setCoarse(window.matchMedia("(hover: none)").matches), [])
 
@@ -210,7 +209,6 @@ export function PortalGate({ onEnter }: { onEnter: (world: WorldId) => void }) {
             ))}
           </span>
           <span className="gate-label">Sites</span>
-          {sitePlate && <span className="gate-site-name">{sitePlate.name}</span>}
         </button>
 
         {/* Decorative: the destinations above are the content and the

@@ -6,10 +6,12 @@ import { WorldChrome } from "./ImageExhibition"
 /**
  * SITES — the product room.
  *
- * Films want a strip. Stills want a field. Products want a surface you
- * can look at and then open. One plate at a time: the live site on the
- * right, the name and one true line on the left. The rest wait as a thin
- * index along the foot, so the room stays a cut rather than a logo wall.
+ * Same grammar as the last frame and the gate: one full-bleed surface,
+ * words standing on it, nothing else. No side panel, no thumbnail strip,
+ * no card shadow — those make product work look like a pitch deck.
+ *
+ * The other products wait as names under the frame, the way a film strip
+ * waits under the program. Open site is the only call.
  */
 export function SitesRoom({ onClose }: { onClose: () => void }) {
   const [index, setIndex] = useState(0)
@@ -42,8 +44,21 @@ export function SitesRoom({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="sites-room">
-      <div className="sites-stage">
-        <div className="sites-copy">
+      <div className="sites-frame">
+        {sites.map((item, i) => (
+          <img
+            key={item.id}
+            className="sites-bleed"
+            src={item.poster}
+            alt={i === index ? item.alt : ""}
+            data-on={i === index || undefined}
+            aria-hidden={i === index ? undefined : true}
+            decoding="async"
+          />
+        ))}
+        <span className="sites-veil" aria-hidden="true" />
+
+        <div className="sites-words">
           <p className="sites-kind">{work.kind}</p>
           <h2 className="sites-name">{work.name}</h2>
           <p className="sites-line">{work.line}</p>
@@ -58,35 +73,21 @@ export function SitesRoom({ onClose }: { onClose: () => void }) {
               ↗
             </span>
           </a>
-          <p className="sites-count">
-            {String(index + 1).padStart(2, "0")} / {String(sites.length).padStart(2, "0")}
-          </p>
         </div>
-
-        <a
-          className="sites-surface"
-          href={work.href}
-          target="_blank"
-          rel="noreferrer noopener"
-          aria-label={`Open ${work.name}`}
-        >
-          <img key={work.id} src={work.poster} alt={work.alt} decoding="async" />
-        </a>
       </div>
 
-      <div className="sites-index" role="tablist" aria-label="Sites">
+      <div className="sites-names" role="tablist" aria-label="Sites">
         {sites.map((item, i) => (
           <button
             key={item.id}
             type="button"
             role="tab"
             aria-selected={i === index}
-            className="sites-thumb"
+            className="sites-name-link"
             data-on={i === index || undefined}
             onClick={() => setIndex(i)}
           >
-            <img src={item.poster} alt="" loading="lazy" decoding="async" />
-            <span>{item.name}</span>
+            {item.name}
           </button>
         ))}
       </div>

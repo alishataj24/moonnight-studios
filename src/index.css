@@ -920,18 +920,6 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   left: clamp(1rem, 2.2vw, 2rem);
   bottom: clamp(0.75rem, 1.8vw, 1.5rem);
 }
-.gate-site-name {
-  position: absolute;
-  z-index: 2;
-  right: clamp(1rem, 2.2vw, 2rem);
-  bottom: clamp(0.95rem, 2vw, 1.7rem);
-  font-size: 0.68rem;
-  font-weight: 500;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: rgba(240, 236, 228, 0.72);
-  pointer-events: none;
-}
 /* A rule that draws itself under the name on approach. The only mark
    on the two fields, and it only exists while you are reaching for
    one — it is feedback, not furniture. */
@@ -969,10 +957,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 }
 .gate-stage[data-near="images"] .gate-field:not([data-world="images"]) .gate-label,
 .gate-stage[data-near="films"] .gate-field:not([data-world="films"]) .gate-label,
-.gate-stage[data-near="sites"] .gate-field:not([data-world="sites"]) .gate-label,
-.gate-stage[data-near="images"] .gate-field:not([data-world="images"]) .gate-site-name,
-.gate-stage[data-near="films"] .gate-field:not([data-world="films"]) .gate-site-name,
-.gate-stage[data-near="sites"] .gate-field:not([data-world="sites"]) .gate-site-name {
+.gate-stage[data-near="sites"] .gate-field:not([data-world="sites"]) .gate-label {
   opacity: 0.45;
 }
 
@@ -1062,10 +1047,6 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   }
   .gate-stage .gate-field[data-world="sites"] {
     aspect-ratio: 16 / 10;
-  }
-  .gate-site-name {
-    right: clamp(0.9rem, 4vw, 1.5rem);
-    bottom: clamp(0.85rem, 3vw, 1.35rem);
   }
   .gate-stage { gap: 1.6rem; }
   .gate-media img, .gate-media video { transform: scale(1); }
@@ -1271,138 +1252,126 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   inset: 0;
   display: grid;
   grid-template-rows: 1fr auto;
-  gap: clamp(1.2rem, 3vh, 2.2rem);
+  gap: 1.1rem;
   padding:
-    calc(4.5rem + env(safe-area-inset-top, 0px))
+    calc(3.4rem + env(safe-area-inset-top, 0px))
     var(--gutter)
-    calc(5.2rem + env(safe-area-inset-bottom, 0px));
+    calc(4.8rem + env(safe-area-inset-bottom, 0px));
   color: var(--ivory);
 }
-.sites-stage {
-  display: grid;
-  grid-template-columns: minmax(14rem, 0.9fr) minmax(0, 1.6fr);
-  gap: clamp(1.4rem, 4vw, 3.5rem);
-  align-items: end;
-  min-height: 0;
-}
-.sites-copy {
-  display: grid;
-  align-content: end;
-  gap: 0.85rem;
-  max-width: 28rem;
-  padding-bottom: 0.4rem;
-}
-.sites-kind {
-  font-size: 0.68rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: rgba(240, 236, 228, 0.5);
-}
-.sites-name {
-  font-family: var(--face);
-  font-size: clamp(2.2rem, 5vw, 4.2rem);
-  font-weight: 300;
-  letter-spacing: -0.035em;
-  line-height: 1.02;
-}
-.sites-line {
-  font-size: clamp(0.98rem, 1.5vw, 1.15rem);
-  line-height: 1.55;
-  color: rgba(240, 236, 228, 0.78);
-  max-width: 34ch;
-}
-.sites-open {
-  justify-self: start;
-  margin-top: 0.4rem;
-}
-.sites-count {
-  font-size: 0.66rem;
-  letter-spacing: 0.18em;
-  color: rgba(240, 236, 228, 0.42);
-  font-variant-numeric: tabular-nums;
-}
-.sites-surface {
+.sites-frame {
   position: relative;
-  display: block;
   min-height: 0;
-  aspect-ratio: 16 / 9;
   overflow: hidden;
-  background: #0a1018;
-  box-shadow:
-    0 0 0 1px rgba(240, 236, 228, 0.08),
-    0 28px 80px rgba(0, 0, 0, 0.45);
+  background: #070b12;
 }
-.sites-surface img {
+.sites-bleed {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
   object-position: top center;
-  display: block;
+  opacity: 0;
+  transform: scale(1.04);
+  transition:
+    opacity 0.9s var(--ease),
+    transform 1.4s var(--ease-film);
+  pointer-events: none;
 }
-.sites-surface:hover img,
-.sites-surface:focus-visible img {
-  transform: scale(1.02);
-}
-.sites-surface img {
-  transition: transform 1s var(--ease-film);
-}
-.sites-index {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(7.5rem, 1fr);
-  gap: 0.65rem;
-  overflow-x: auto;
-  padding-bottom: 0.2rem;
-  scrollbar-width: none;
-}
-.sites-index::-webkit-scrollbar { display: none; }
-.sites-thumb {
-  border: 0;
-  padding: 0;
-  background: none;
-  color: rgba(240, 236, 228, 0.55);
-  text-align: left;
-  cursor: pointer;
-  display: grid;
-  gap: 0.45rem;
-}
-.sites-thumb img {
-  width: 100%;
-  aspect-ratio: 16 / 10;
-  object-fit: cover;
-  object-position: top center;
-  opacity: 0.55;
-  filter: saturate(0.7);
-  transition: opacity 0.4s var(--ease), filter 0.4s var(--ease);
-}
-.sites-thumb span {
-  font-size: 0.62rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-.sites-thumb[data-on] { color: var(--ivory); }
-.sites-thumb[data-on] img,
-.sites-thumb:hover img,
-.sites-thumb:focus-visible img {
+.sites-bleed[data-on] {
   opacity: 1;
-  filter: none;
+  transform: scale(1);
+}
+.sites-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      to top,
+      rgba(7, 11, 18, 0.96) 0%,
+      rgba(7, 11, 18, 0.72) 28%,
+      rgba(7, 11, 18, 0.18) 58%,
+      rgba(7, 11, 18, 0.35) 100%
+    );
+}
+.sites-words {
+  position: absolute;
+  z-index: 2;
+  left: clamp(1.1rem, 3vw, 2.4rem);
+  right: clamp(1.1rem, 3vw, 2.4rem);
+  bottom: clamp(1.2rem, 3.2vh, 2.2rem);
+  display: grid;
+  gap: 0.55rem;
+  max-width: 34rem;
+}
+.sites-kind {
+  font-size: 0.66rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(240, 236, 228, 0.55);
+}
+.sites-name {
+  font-family: var(--face);
+  font-size: clamp(2.4rem, 6vw, 4.6rem);
+  font-weight: 300;
+  letter-spacing: -0.04em;
+  line-height: 0.98;
+}
+.sites-line {
+  font-size: clamp(0.95rem, 1.5vw, 1.12rem);
+  line-height: 1.5;
+  color: rgba(240, 236, 228, 0.78);
+  max-width: 36ch;
+}
+.sites-open {
+  justify-self: start;
+  margin-top: 0.35rem;
+}
+.sites-names {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.35rem;
+  align-items: center;
+  justify-content: center;
+}
+.sites-name-link {
+  border: 0;
+  padding: 0.35rem 0;
+  background: none;
+  cursor: pointer;
+  color: rgba(240, 236, 228, 0.38);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  transition: color 0.35s var(--ease);
+}
+.sites-name-link:hover,
+.sites-name-link:focus-visible,
+.sites-name-link[data-on] {
+  color: var(--ivory);
+}
+.sites-name-link[data-on] {
+  color: var(--accent);
 }
 
-@media (max-width: 900px) {
-  .sites-stage {
-    grid-template-columns: 1fr;
-    align-items: stretch;
-    gap: 1.2rem;
+@media (max-width: 760px) {
+  .sites-room {
+    gap: 0.85rem;
+    padding-top: calc(4.2rem + env(safe-area-inset-top, 0px));
   }
-  .sites-copy {
-    order: 2;
-    align-content: start;
-    max-width: none;
+  .sites-names {
+    justify-content: flex-start;
+    gap: 0.2rem 1rem;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
   }
-  .sites-surface { order: 1; }
-  .sites-index {
-    grid-auto-columns: minmax(6.2rem, 38vw);
-  }
+  .sites-names::-webkit-scrollbar { display: none; }
+  .sites-name-link { white-space: nowrap; }
 }
 
 /* ---------- FILMS — the screening room --------------------------- */
